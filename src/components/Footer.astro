@@ -1,0 +1,86 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-left">
+      <span class="footer-name">Benjamin Davis</span>
+      <span class="footer-tagline">Advanced Manufacturing · Wrentham, MA</span>
+    </div>
+
+    <div class="footer-links">
+      <a href="mailto:benjamindavisma@gmail.com" aria-label="Send email to Benjamin Davis">Email</a>
+      <a href="https://www.linkedin.com/in/benjamin-davis-60726635a/" target="_blank" rel="noopener noreferrer" aria-label="Benjamin Davis on LinkedIn">LinkedIn</a>
+    </div>
+  </div>
+
+  <div class="container footer-bottom">
+    <span class="muted">&copy; {year} Benjamin Davis. All rights reserved.</span>
+    <span class="footer-divider" aria-hidden="true">·</span>
+    <span class="muted">Bishop Feehan High School, Class of 2027</span>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    margin-top: auto;
+    border-top: 1px solid var(--panel-edge);
+    padding-block: 1.5rem 1rem;
+  }
+
+  .footer-inner {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .footer-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .footer-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+
+  .footer-tagline {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--steel);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 1.25rem;
+    align-items: center;
+  }
+
+  .footer-links a {
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--steel);
+    transition: color 0.15s;
+  }
+  .footer-links a:hover { color: var(--gold); }
+
+  .footer-bottom {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+  }
+
+  .footer-divider { color: var(--panel-edge); }
+</style>

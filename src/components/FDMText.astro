@@ -1,0 +1,619 @@
+---
+// FDMText.astro — FDM 3D-printing text reveal.
+// Wraps any heading; on scroll-into-view it simulates the text being
+// printed by a moving FDM toolhead that lays down molten filament beads,
+// traces the glyph outlines, then fills with visible rectilinear infill.
+// Real heading stays in DOM; canvas is aria-hidden.
+//
+//   <FDMText id="equipment-hero" duration={3.5} delay={0.4}>
+//     <h1 class="hero-heading">Your heading</h1>
+//   </FDMText>
+interface Props {
+  duration?: number;       // total seconds (default 3.5)
+  delay?:    number;       // start delay in seconds (default 0.25)
+  trigger?:  'scroll' | 'load';
+  id?:       string;
+  class?:    string;
+}
+const {
+  duration = 3.5,
+  delay    = 0.25,
+  trigger  = 'scroll',
+  id,
+  class: cls,
+} = Astro.props;
+const fdmId = id ?? ('fdm-' + Math.random().toString(36).slice(2, 8));
+---
+
+<div
+  class:list={['fdm-wrap', cls]}
+  data-fdm-duration={String(duration)}
+  data-fdm-delay={String(delay)}
+  data-fdm-trigger={trigger}
+  data-fdm-id={fdmId}
+>
+  <slot />
+  <canvas class="fdm-bed" aria-hidden="true"></canvas>
+  <canvas class="fdm-fx"  aria-hidden="true"></canvas>
+</div>
+
+<style>
+  .fdm-wrap {
+    position: relative;
+    display: block;
+  }
+  .fdm-bed,
+  .fdm-fx {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: block;
+  }
+  .fdm-bed { z-index: 10; }
+  .fdm-fx  { z-index: 11; }
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  const REDUCED     = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let   nActive     = 0;
+  const MAX_ACT     = 2;
+  const GYROID_STEP = 8;    // px between gyroid scan rows
+  const GYROID_FREQ = Math.PI * 2 / 44; // rad/px — one full wave per 44px
+  const GYROID_AMP  = 5;   // px amplitude — reduced so crossing mesh stays open
+  const TRAIL_LIFE  = 0.40; // s for hot bead glow to fade
+  // Speed ramp normalisation constant = integral of (1 + t*2) dt from 0→1
+  const RAMP_NORM   = 2.0;
+
+  function mk(w: number, h: number): HTMLCanvasElement {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h; return c;
+  }
+  function eio(t: number) { return t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t; }
+  function rrect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y); ctx.arcTo(x+w, y, x+w, y+r, r);
+    ctx.lineTo(x+w, y+h-r);  ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+    ctx.lineTo(x+r, y+h);    ctx.arcTo(x, y+h, x, y+h-r, r);
+    ctx.lineTo(x, y+r);      ctx.arcTo(x, y, x+r, y, r);
+    ctx.closePath();
+  }
+
+  /* ── PEI / glass print bed ─────────────────────────────────────────────────── */
+  function renderBed(ctx: CanvasRenderingContext2D, W: number, H: number) {
+    ctx.fillStyle = '#111009';
+    ctx.fillRect(0, 0, W, H);
+    // Faint grid (PEI texture / glass bed squares)
+    ctx.strokeStyle = 'rgba(38,34,26,0.60)';
+    ctx.lineWidth = 0.5;
+    const G = 16;
+    for (let x = G; x < W; x += G) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = G; y < H; y += G) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    // Soft center specular (top-down light)
+    const sp = ctx.createRadialGradient(W*0.5, H*0.42, 0, W*0.5, H*0.42, Math.max(W, H));
+    sp.addColorStop(0, 'rgba(65,54,38,0.18)');
+    sp.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sp; ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ── Deposited filament — warm copper/orange with bead-line ribbing ─────────── */
+  function renderDeposited(ctx: CanvasRenderingContext2D, W: number, H: number) {
+    ctx.fillStyle = '#b86e28';
+    ctx.fillRect(0, 0, W, H);
+    // Horizontal bead-line ribbing (coarser than SLA scan lines — ~3px pitch)
+    ctx.strokeStyle = 'rgba(148, 80, 18, 0.28)';
+    ctx.lineWidth = 0.8;
+    for (let y = 1.5; y < H; y += 3) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    // Gloss highlight
+    const sh = ctx.createLinearGradient(0, 0, W * 0.30, H * 0.30);
+    sh.addColorStop(0, 'rgba(255,200,100,0.22)');
+    sh.addColorStop(1, 'rgba(255,160,60,0)');
+    ctx.fillStyle = sh; ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ── Letter pixel mask ─────────────────────────────────────────────────────── */
+  function buildMask(wrap: HTMLElement, heading: HTMLElement, W: number, H: number) {
+    const off = mk(W, H);
+    const ctx = off.getContext('2d')!;
+    const pr  = wrap.getBoundingClientRect();
+    const range = document.createRange();
+    ctx.fillStyle = '#fff';
+    function walk(node: Node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const txt = (node.textContent || '').trim();
+        if (!txt) return;
+        const el = (node.parentElement ?? heading) as HTMLElement;
+        const cs = window.getComputedStyle(el);
+        ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        ctx.textBaseline = 'alphabetic';
+        const m = ctx.measureText(txt);
+        range.selectNode(node);
+        for (const r of Array.from(range.getClientRects())) {
+          if (r.width < 2) continue;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(r.left - pr.left, r.top - pr.top, r.width + 1, r.height + 1);
+          ctx.clip();
+          ctx.fillText(txt, r.left - pr.left, r.top - pr.top + m.fontBoundingBoxAscent);
+          ctx.restore();
+        }
+      } else { node.childNodes.forEach(walk); }
+    }
+    walk(heading);
+    return ctx.getImageData(0, 0, W, H).data;
+  }
+
+  function inLtr(mpx: Uint8ClampedArray, W: number, H: number, x: number, y: number) {
+    const xi = Math.max(0, Math.min(W-1, Math.round(x)));
+    const yi = Math.max(0, Math.min(H-1, Math.round(y)));
+    return mpx[(yi*W + xi)*4] > 60;
+  }
+
+  /* ── Contour: bottom-edge L→R, top-edge R→L ──────────────────────────────── */
+  function extractContour(mpx: Uint8ClampedArray, W: number, H: number) {
+    type P = { x: number; y: number; gap?: true };
+    const bot: P[] = [], top: P[] = [];
+    for (let x = 0; x < W; x++) {
+      let yt = -1, yb = -1;
+      for (let y = 0; y < H; y++) {
+        if (mpx[(y*W+x)*4] > 60) { if (yt < 0) yt = y; yb = y; }
+      }
+      if (yt >= 0) { bot.push({ x, y: yb+1.5 }); top.push({ x, y: yt-1.5 }); }
+    }
+    const path: P[] = [];
+    for (let i = 0; i < bot.length; i++) {
+      if (i > 0 && bot[i].x - bot[i-1].x > 6) path.push({ ...bot[i], gap: true });
+      else path.push(bot[i]);
+    }
+    for (let i = top.length-1; i >= 0; i--) {
+      if (i < top.length-1 && top[i+1].x - top[i].x > 6) path.push({ ...top[i], gap: true });
+      else path.push(top[i]);
+    }
+    return path;
+  }
+
+  /* ── Gyroid infill — two perpendicular sinusoidal families that cross ──────── */
+  function genGyroid(mpx: Uint8ClampedArray, W: number, H: number) {
+    const segs: [number,number,number,number][] = [];
+    const SP = 2; // sample step in px
+
+    // Horizontal family: y = yBase + A·sin(k·x + φ)
+    let ltr = true;
+    for (let iy = 0; ; iy++) {
+      const yBase = GYROID_STEP * 0.5 + iy * GYROID_STEP;
+      if (yBase - GYROID_AMP > H) break;
+      const phase = iy % 2 === 0 ? 0 : Math.PI;
+      const xStart = ltr ? 0 : W, xDir = ltr ? SP : -SP;
+      let prevX = -1, prevY = -1, prevIn = false;
+      for (let xi = 0; ; xi++) {
+        const x = xStart + xi * xDir;
+        if (ltr ? x > W + SP : x < -SP) break;
+        const y = yBase + GYROID_AMP * Math.sin(GYROID_FREQ * x + phase);
+        const inside = y >= 0 && y < H && inLtr(mpx, W, H, x, y);
+        if (prevIn && inside && prevX >= 0) segs.push([prevX, prevY, x, y]);
+        prevX = x; prevY = y; prevIn = inside;
+      }
+      ltr = !ltr;
+    }
+
+    // Vertical family: x = xBase + A·sin(k·y + φ) — perpendicular, creates crossing mesh
+    let ttb = true;
+    for (let ix = 0; ; ix++) {
+      const xBase = GYROID_STEP * 0.5 + ix * GYROID_STEP;
+      if (xBase - GYROID_AMP > W) break;
+      const phase = ix % 2 === 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+      const yStart = ttb ? 0 : H, yDir = ttb ? SP : -SP;
+      let prevX = -1, prevY = -1, prevIn = false;
+      for (let yi = 0; ; yi++) {
+        const y = yStart + yi * yDir;
+        if (ttb ? y > H + SP : y < -SP) break;
+        const x = xBase + GYROID_AMP * Math.sin(GYROID_FREQ * y + phase);
+        const inside = x >= 0 && x < W && inLtr(mpx, W, H, x, y);
+        if (prevIn && inside && prevX >= 0) segs.push([prevX, prevY, x, y]);
+        prevX = x; prevY = y; prevIn = inside;
+      }
+      ttb = !ttb;
+    }
+
+    return segs;
+  }
+
+  /* ── Skirt rectangle around letter bounding box ───────────────────────────── */
+  function genSkirtSegs(mpx: Uint8ClampedArray, W: number, H: number, pad: number) {
+    let x0 = W, x1 = 0, y0 = H, y1 = 0;
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++)
+        if (mpx[(y*W+x)*4] > 60) { x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); }
+    if (x0 > x1) return { segs: [] as [number,number,number,number][], len: 0, startX: 0, startY: 0 };
+    const [ax, ay, bx, by] = [x0-pad, y0-pad, x1+pad, y1+pad];
+    const segs: [number,number,number,number][] = [
+      [ax,ay, bx,ay], [bx,ay, bx,by], [bx,by, ax,by], [ax,by, ax,ay],
+    ];
+    const len = segs.reduce((a,[x1,y1,x2,y2]) => a + Math.hypot(x2-x1, y2-y1), 0);
+    return { segs, len, startX: ax, startY: ay };
+  }
+
+  /* ── Full FDM toolhead (heater block + fan duct + carriage + glow) ──────────── */
+  function drawToolhead(ctx: CanvasRenderingContext2D, nx: number, ny: number, hot: number, S: number) {
+    ctx.save();
+
+    // Drop shadow (hovering above bed)
+    const shg = ctx.createRadialGradient(nx+3*S, ny+5*S, 0, nx+3*S, ny+5*S, 20*S);
+    shg.addColorStop(0, 'rgba(0,0,0,0.38)'); shg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = shg;
+    ctx.beginPath(); ctx.ellipse(nx+3*S, ny+5*S, 18*S, 11*S, 0, 0, Math.PI*2); ctx.fill();
+
+    // PTFE tube hint (white tube above carriage)
+    ctx.fillStyle = 'rgba(220,225,235,0.70)';
+    ctx.fillRect(nx - 1.5*S, ny - 32*S, 3*S, 12*S);
+
+    // Carriage backplate (dark anodized aluminum)
+    ctx.fillStyle = '#1a1e26';
+    rrect(ctx, nx - 12*S, ny - 22*S, 24*S, 16*S, 2*S); ctx.fill();
+    // Carriage machining lines
+    ctx.strokeStyle = 'rgba(38,44,58,0.55)'; ctx.lineWidth = 0.5;
+    for (let dy = 3*S; dy < 16*S; dy += 3.5*S) {
+      ctx.beginPath(); ctx.moveTo(nx-12*S, ny-22*S+dy); ctx.lineTo(nx+12*S, ny-22*S+dy); ctx.stroke();
+    }
+
+    // Heatsink fins + heat break (fills gap between carriage bottom and heater block top)
+    ctx.fillStyle = 'rgba(130,140,152,0.88)';
+    ctx.fillRect(nx - 1.2*S, ny - 17*S, 2.4*S, 11*S); // heat break tube
+    ctx.fillStyle = '#23272f';
+    for (let fi = 0; fi < 3; fi++) {
+      ctx.fillRect(nx - 5.5*S, ny - 8*S - fi * 2.8*S, 11*S, 1.6*S);
+    }
+
+    // Heater block (brass)
+    const hbg = ctx.createLinearGradient(nx-5.5*S, 0, nx+5.5*S, 0);
+    hbg.addColorStop(0, '#6a5015'); hbg.addColorStop(0.45, '#b08828'); hbg.addColorStop(1, '#6a5015');
+    ctx.fillStyle = hbg;
+    rrect(ctx, nx-5.5*S, ny-17*S, 11*S, 12*S, 1.5*S); ctx.fill();
+
+    // Heater wire/cartridge hint (red wire to side)
+    ctx.strokeStyle = 'rgba(190,55,18,0.85)'; ctx.lineWidth = 1.5*S; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(nx-5.5*S, ny-11*S); ctx.lineTo(nx-9*S, ny-9*S); ctx.stroke();
+
+    // Part-cooling fan duct (D-shape, left of heater block)
+    ctx.fillStyle = '#162038';
+    ctx.beginPath();
+    ctx.arc(nx-15*S, ny-12*S, 7.5*S, -Math.PI*0.52, Math.PI*0.52);
+    ctx.lineTo(nx-9*S, ny-12*S); ctx.closePath(); ctx.fill();
+    // Duct opening
+    ctx.fillStyle = '#1c2c4a';
+    ctx.beginPath();
+    ctx.arc(nx-15*S, ny-12*S, 5.5*S, -Math.PI*0.42, Math.PI*0.42);
+    ctx.lineTo(nx-11*S, ny-12*S); ctx.closePath(); ctx.fill();
+
+    // Nozzle stub (tapered throat)
+    ctx.fillStyle = '#221808';
+    ctx.beginPath();
+    ctx.moveTo(nx-3*S, ny-5*S); ctx.lineTo(nx+3*S, ny-5*S);
+    ctx.lineTo(nx+1.2*S, ny-0.5*S); ctx.lineTo(nx-1.2*S, ny-0.5*S);
+    ctx.closePath(); ctx.fill();
+
+    // Nozzle tip dot
+    ctx.fillStyle = '#2e2010';
+    ctx.beginPath(); ctx.arc(nx, ny, 1.5*S, 0, Math.PI*2); ctx.fill();
+
+    // Nozzle glow (hot orange — scales with 'hot' param)
+    if (hot > 0.02) {
+      const ng = ctx.createRadialGradient(nx, ny, 0, nx, ny, 12*S);
+      ng.addColorStop(0,    `rgba(255,160,42,${(0.82*hot).toFixed(2)})`);
+      ng.addColorStop(0.22, `rgba(255,105,18,${(0.42*hot).toFixed(2)})`);
+      ng.addColorStop(0.55, `rgba(255,65,5,${(0.14*hot).toFixed(2)})`);
+      ng.addColorStop(1,    'rgba(255,35,0,0)');
+      ctx.fillStyle = ng;
+      ctx.beginPath(); ctx.arc(nx, ny, 12*S, 0, Math.PI*2); ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  /* ── Draw skirt trace at fraction f of total length ───────────────────────── */
+  function drawSkirt(ctx: CanvasRenderingContext2D,
+                     segs: [number,number,number,number][], len: number, f: number) {
+    if (!segs.length || f <= 0) return;
+    let target = f * len;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(192,112,42,0.85)';
+    ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(segs[0][0], segs[0][1]);
+    for (const [x1,y1,x2,y2] of segs) {
+      const l = Math.hypot(x2-x1, y2-y1);
+      if (target >= l) { ctx.lineTo(x2, y2); target -= l; }
+      else { ctx.lineTo(x1+(x2-x1)*target/l, y1+(y2-y1)*target/l); break; }
+    }
+    ctx.stroke(); ctx.restore();
+  }
+
+  /* ── Main setup ────────────────────────────────────────────────────────────── */
+  function setup(wrap: HTMLElement) {
+    if (nActive >= MAX_ACT) { setTimeout(() => setup(wrap), 300); return; }
+    nActive++;
+
+    const bedEl = wrap.querySelector<HTMLCanvasElement>('.fdm-bed');
+    const fxEl  = wrap.querySelector<HTMLCanvasElement>('.fdm-fx');
+    if (!bedEl || !fxEl) { nActive--; return; }
+
+    const heading = wrap.querySelector<HTMLElement>('h1,h2,h3,h4,h5,h6,[data-fdm]');
+    if (!heading) { nActive--; return; }
+
+    const DUR   = parseFloat(wrap.dataset.fdmDuration || '3.5') * 1000;
+    const DELAY = parseFloat(wrap.dataset.fdmDelay    || '0.25') * 1000;
+
+    const rect = wrap.getBoundingClientRect();
+    const W = Math.floor(rect.width);
+    const H = Math.floor(rect.height);
+    if (W < 40 || H < 8) { nActive--; return; }
+
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const PW  = Math.round(W * DPR);
+    const PH  = Math.round(H * DPR);
+    const THS = Math.max(0.55, Math.min(1.75, H / 46)); // toolhead scale
+
+    [bedEl, fxEl].forEach(c => {
+      c.width = PW; c.height = PH;
+      c.style.width = W + 'px'; c.style.height = H + 'px';
+    });
+    const bCtx = bedEl.getContext('2d')!;
+    const fCtx = fxEl.getContext('2d')!;
+    bCtx.scale(DPR, DPR); fCtx.scale(DPR, DPR);
+
+    // Pre-render bed and deposited surfaces
+    const bedOff   = mk(PW, PH);
+    { const c = bedOff.getContext('2d')!;   c.scale(DPR, DPR); renderBed(c, W, H); }
+    const deposOff = mk(PW, PH);
+    { const c = deposOff.getContext('2d')!; c.scale(DPR, DPR); renderDeposited(c, W, H); }
+
+    // Accumulation canvas (grows as filament is deposited)
+    const accOff = mk(PW, PH);
+    const acCtx  = accOff.getContext('2d')!; acCtx.scale(DPR, DPR);
+
+    // Scratch canvas
+    const tmpOff = mk(PW, PH);
+    const tmCtx  = tmpOff.getContext('2d')!; tmCtx.scale(DPR, DPR);
+
+    document.fonts.ready.then(() => {
+      const mpx = buildMask(wrap, heading, W, H);
+
+      // Generate toolpaths
+      const cPath  = extractContour(mpx, W, H);
+      const hSegs  = genGyroid(mpx, W, H);
+      const hLen   = hSegs.reduce((a,[x1,y1,x2,y2]) => a + Math.hypot(x2-x1,y2-y1), 0);
+      const { segs: skirtSegs, len: skirtLen, startX: skirtX, startY: skirtY } =
+        genSkirtSegs(mpx, W, H, 7);
+
+      /* Phase schedule (fractions of DUR) */
+      interface Ph { name: string; t0: number; t1: number }
+      const phases: Ph[] = [
+        { name:'bed',     t0:0.00, t1:0.07 },
+        { name:'skirt',   t0:0.07, t1:0.15 },
+        { name:'contour', t0:0.15, t1:0.37 },
+        { name:'infill',  t0:0.37, t1:0.83 },
+        { name:'park',    t0:0.83, t1:1.00 },
+      ];
+      const infillDurSec = (0.83 - 0.37) * DUR / 1000;
+      const contourDurSec = (0.37 - 0.15) * DUR / 1000;
+
+      // State
+      let phaseIdx   = 0;
+      let cIdx       = 0;
+      let hIdx       = 0, hT = 0;
+      let toolX      = W + 20, toolY = -25;   // starts off-screen top-right
+      let nozzleHot  = 0;
+      let skirtFrac  = 0;
+      let parkStartX = 0, parkStartY = 0;
+      let lastPhName = '';
+      type TrailPt   = { x:number; y:number; age:number };
+      const trail: TrailPt[] = [];
+      let lastTs: number | null = null;
+      let startTs = 0;
+
+      /* Composite: bed + deposited material (masked by accOff) + skirt line */
+      function composite() {
+        bCtx.clearRect(0, 0, W, H);
+        bCtx.drawImage(bedOff, 0, 0, W, H);
+        tmCtx.clearRect(0, 0, W, H);
+        tmCtx.drawImage(deposOff, 0, 0, W, H);
+        tmCtx.globalCompositeOperation = 'destination-in';
+        tmCtx.drawImage(accOff, 0, 0, W, H);
+        tmCtx.globalCompositeOperation = 'source-over';
+        bCtx.drawImage(tmpOff, 0, 0, W, H);
+        // Skirt traced as direct stroke outside letter mask
+        drawSkirt(bCtx, skirtSegs, skirtLen, skirtFrac);
+      }
+
+      /* Deposit filament at (x, y) onto accumulation canvas */
+      function depositAt(x: number, y: number) {
+        acCtx.fillStyle = '#fff';
+        acCtx.beginPath(); acCtx.arc(x, y, 3.5, 0, Math.PI*2); acCtx.fill();
+      }
+
+      function finalise() {
+        fxEl.style.display = 'none';
+        bedEl.style.transition = 'opacity 0.28s ease';
+        bedEl.style.opacity = '0';
+        heading.style.visibility = 'visible';
+        setTimeout(() => { bedEl.style.display = 'none'; nActive--; }, 320);
+      }
+
+      function showDone() {
+        bedEl.style.display = 'none'; fxEl.style.display = 'none';
+        heading.style.visibility = 'visible'; nActive--;
+      }
+
+      if (REDUCED) { showDone(); return; }
+
+      heading.style.visibility = 'hidden';
+      // Show bed texture immediately
+      bCtx.drawImage(bedOff, 0, 0, W, H);
+
+      function frame(ts: number) {
+        if (!lastTs) lastTs = ts;
+        const dt  = Math.min((ts - lastTs) / 1000, 0.05);
+        lastTs = ts;
+        const pct = Math.min((ts - startTs) / DUR, 1.0);
+
+        while (phaseIdx < phases.length - 1 && pct >= phases[phaseIdx].t1) phaseIdx++;
+        const ph = phases[phaseIdx];
+        const pt = ph.t1 > ph.t0 ? Math.min(1, (pct - ph.t0) / (ph.t1 - ph.t0)) : 1;
+
+        // Phase entry reset
+        if (ph.name === 'contour' && lastPhName !== 'contour') cIdx = 0;
+        if (ph.name === 'park'    && lastPhName !== 'park') {
+          parkStartX = toolX; parkStartY = toolY;
+        }
+        lastPhName = ph.name;
+
+        // Age and prune hot bead trail
+        for (const tp of trail) tp.age += dt / TRAIL_LIFE;
+        while (trail.length > 0 && trail[0].age >= 1) trail.shift();
+
+        fCtx.clearRect(0, 0, W, H);
+
+        /* ── BED SETTLE + TOOLHEAD ARRIVES ─────────────────────────────────── */
+        if (ph.name === 'bed') {
+          bCtx.clearRect(0, 0, W, H);
+          bCtx.globalAlpha = eio(pt);
+          bCtx.drawImage(bedOff, 0, 0, W, H);
+          bCtx.globalAlpha = 1;
+          // Fly in from top-right to skirt start position
+          const e = eio(pt);
+          toolX = W + 20 + e * (skirtX - W - 20);
+          toolY = -25   + e * (skirtY - (-25));
+          nozzleHot = 0.25 * eio(pt);
+          drawToolhead(fCtx, toolX, toolY, nozzleHot, THS);
+
+        /* ── SKIRT TRACE ──────────────────────────────────────────────────── */
+        } else if (ph.name === 'skirt') {
+          composite();
+          // Find toolhead position along skirt at phase progress pt
+          let target = pt * skirtLen;
+          toolX = skirtSegs.length ? skirtSegs[0][0] : toolX;
+          toolY = skirtSegs.length ? skirtSegs[0][1] : toolY;
+          for (const [x1,y1,x2,y2] of skirtSegs) {
+            const l = Math.hypot(x2-x1, y2-y1);
+            if (target <= l) { const f=target/l; toolX=x1+(x2-x1)*f; toolY=y1+(y2-y1)*f; break; }
+            target -= l; toolX = x2; toolY = y2;
+          }
+          nozzleHot = 0.72;
+          skirtFrac = pt;
+          // Hot trail for skirt (outside letters — just for toolhead visual)
+          trail.push({ x: toolX, y: toolY, age: 0 });
+          if (trail.length > 60) trail.splice(0, trail.length - 60);
+          drawToolhead(fCtx, toolX, toolY, nozzleHot, THS);
+
+        /* ── CONTOUR PASS (slow, deliberate) ────────────────────────────────── */
+        } else if (ph.name === 'contour') {
+          if (cPath.length) {
+            const speed = cPath.length / contourDurSec;
+            let rem = speed * dt;
+            while (rem > 0 && cIdx < cPath.length) {
+              const p = cPath[cIdx++];
+              if (!p.gap) { depositAt(p.x, p.y); toolX=p.x; toolY=p.y; nozzleHot=1; }
+              else        { toolX=p.x; toolY=p.y; nozzleHot=0.35; }
+              rem--;
+            }
+          }
+          composite();
+          for (const tp of trail) {
+            const a = (1-tp.age) * 0.65;
+            if (a < 0.02) continue;
+            const tg = fCtx.createRadialGradient(tp.x,tp.y,0, tp.x,tp.y, 5.5*THS);
+            tg.addColorStop(0, `rgba(255,168,40,${a.toFixed(2)})`); tg.addColorStop(1,'rgba(240,80,0,0)');
+            fCtx.fillStyle=tg; fCtx.beginPath(); fCtx.arc(tp.x,tp.y,5.5*THS,0,Math.PI*2); fCtx.fill();
+          }
+          if (nozzleHot > 0.4) { trail.push({x:toolX,y:toolY,age:0}); if(trail.length>80) trail.splice(0,trail.length-80); }
+          drawToolhead(fCtx, toolX, toolY, nozzleHot, THS);
+
+        /* ── INFILL (accelerating — slow start, very fast finish) ───────────── */
+        } else if (ph.name === 'infill') {
+          if (hLen > 0) {
+            // Speed ramp: sf = 1 + pt*2  (1× → 3×); avg = RAMP_NORM = 2.0
+            const sf = 1 + pt * 2;
+            let rem = (hLen / infillDurSec) / RAMP_NORM * sf * dt;
+            while (rem > 0 && hIdx < hSegs.length) {
+              const [x1,y1,x2,y2] = hSegs[hIdx];
+              const dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy);
+              if (len < 0.1) { hIdx++; continue; }
+              const toEnd = (1-hT)*len;
+              if (rem >= toEnd) {
+                rem -= toEnd; hT=0; hIdx++;
+                depositAt(x2,y2); toolX=x2; toolY=y2; nozzleHot=1;
+              } else {
+                hT += rem/len;
+                const nx=x1+dx*hT, ny=y1+dy*hT;
+                depositAt(nx,ny); toolX=nx; toolY=ny; nozzleHot=1;
+                rem=0;
+              }
+            }
+          }
+          composite();
+          // Hot trail (fades quickly during fast phase)
+          for (const tp of trail) {
+            const a = (1-tp.age) * 0.62;
+            if (a < 0.02) continue;
+            const tg = fCtx.createRadialGradient(tp.x,tp.y,0, tp.x,tp.y, 5*THS);
+            tg.addColorStop(0, `rgba(255,162,38,${a.toFixed(2)})`); tg.addColorStop(1,'rgba(240,75,0,0)');
+            fCtx.fillStyle=tg; fCtx.beginPath(); fCtx.arc(tp.x,tp.y,5*THS,0,Math.PI*2); fCtx.fill();
+          }
+          if (nozzleHot > 0.4) { trail.push({x:toolX,y:toolY,age:0}); if(trail.length>80) trail.splice(0,trail.length-80); }
+          drawToolhead(fCtx, toolX, toolY, nozzleHot, THS);
+
+        /* ── PARK / EXIT ─────────────────────────────────────────────────────── */
+        } else if (ph.name === 'park') {
+          composite();
+          // Toolhead moves off-screen top-right
+          const e = eio(pt);
+          toolX = parkStartX + e * (W + 25 - parkStartX);
+          toolY = parkStartY + e * (-30 - parkStartY);
+          nozzleHot = 1 - eio(Math.min(1, pt * 1.8));  // glow fades quickly
+          // Trail continues to cool
+          for (const tp of trail) {
+            const a = (1-tp.age) * 0.55 * (1-pt);
+            if (a < 0.02) continue;
+            const tg = fCtx.createRadialGradient(tp.x,tp.y,0, tp.x,tp.y, 5*THS);
+            tg.addColorStop(0, `rgba(255,155,35,${a.toFixed(2)})`); tg.addColorStop(1,'rgba(230,65,0,0)');
+            fCtx.fillStyle=tg; fCtx.beginPath(); fCtx.arc(tp.x,tp.y,5*THS,0,Math.PI*2); fCtx.fill();
+          }
+          drawToolhead(fCtx, toolX, toolY, nozzleHot, THS);
+          if (pt >= 1) { finalise(); return; }
+        }
+
+        requestAnimationFrame(frame);
+      }
+
+      setTimeout(() => { startTs = performance.now(); requestAnimationFrame(frame); }, DELAY);
+    });
+  }
+
+  /* ── Observer / init ──────────────────────────────────────────────────────── */
+  function init() {
+    document.querySelectorAll<HTMLElement>('.fdm-wrap').forEach(wrap => {
+      if (REDUCED) return;
+      const trig = wrap.dataset.fdmTrigger || 'scroll';
+      if (trig === 'scroll' && 'IntersectionObserver' in window) {
+        const obs = new IntersectionObserver(entries => {
+          entries.forEach(e => {
+            if (e.isIntersecting) { obs.unobserve(e.target as HTMLElement); setup(e.target as HTMLElement); }
+          });
+        }, { threshold: 0.12, rootMargin: '0px 0px -20px 0px' });
+        obs.observe(wrap);
+      } else {
+        setup(wrap);
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>

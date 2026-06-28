@@ -1,0 +1,215 @@
+---
+// MfgReveal.astro
+// Wraps any heading/text and plays a manufacturing process animation to "create" it.
+//   process="laser" — orange laser traces left → right (engraving)
+//   process="fdm"   — hot nozzle sweeps bottom → top (layer deposition)
+//   process="sla"   — UV bar sweeps left → right (resin curing)
+//
+// trigger="load"   (default) — fires as soon as the element initialises
+// trigger="scroll" — fires once when the element enters the viewport
+
+interface Props {
+  process: 'laser' | 'fdm' | 'sla';
+  duration?: number;   // seconds, default 1.6
+  delay?: number;      // seconds, default 0.3
+  trigger?: 'load' | 'scroll';
+  bg?: string;         // overlay background CSS value — must match parent bg
+  class?: string;
+}
+const {
+  process,
+  duration = 1.6,
+  delay    = 0.3,
+  trigger  = 'load',
+  bg       = 'var(--graphite)',
+  class: cls,
+} = Astro.props;
+---
+
+<div
+  class:list={['mfg-reveal', cls]}
+  data-process={process}
+  data-duration={String(duration)}
+  data-delay={String(delay)}
+  data-trigger={trigger}
+  data-bg={bg}
+>
+  <slot />
+  <div class="mfg-overlay" aria-hidden="true"></div>
+  <div class="mfg-cursor"  aria-hidden="true"></div>
+</div>
+
+<style>
+  .mfg-reveal {
+    position: relative;
+    display: block;
+    width: 100%;
+  }
+
+  /* Overlay — starts covering the slot content, slides away during animation */
+  .mfg-overlay {
+    position: absolute;
+    inset: 0 -6px;   /* tiny bleed so edges don't flicker */
+    pointer-events: none;
+    z-index: 4;
+  }
+
+  /* Cursor — the "tool" moving across the surface */
+  .mfg-cursor {
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0;
+  }
+
+  /* ── Laser engraving cursor — vertical orange line ─────────────────────── */
+  [data-process="laser"] .mfg-cursor {
+    top: -10px;
+    bottom: -10px;
+    width: 2px;
+    left: 0;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      to bottom,
+      transparent       0%,
+      rgba(255, 80, 15, 0.8)   12%,
+      rgba(255, 230, 110, 1)   50%,
+      rgba(255, 80, 15, 0.8)   88%,
+      transparent       100%
+    );
+    box-shadow:
+      0 0 4px  2px rgba(255, 65, 10, 0.85),
+      0 0 12px 5px rgba(255, 50,  5, 0.45),
+      0 0 28px 10px rgba(255, 40,  0, 0.18);
+  }
+
+  /* ── SLA UV-cure cursor — vertical purple bar ──────────────────────────── */
+  [data-process="sla"] .mfg-cursor {
+    top: -10px;
+    bottom: -10px;
+    width: 3px;
+    left: 0;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      to bottom,
+      transparent            0%,
+      rgba(155, 75, 255, 0.85)  12%,
+      rgba(215, 155, 255, 1)    50%,
+      rgba(155, 75, 255, 0.85)  88%,
+      transparent            100%
+    );
+    box-shadow:
+      0 0 5px  2px rgba(135, 55, 255, 0.75),
+      0 0 14px 6px rgba(115, 35, 255, 0.38),
+      0 0 32px 12px rgba(95, 15, 255, 0.16);
+  }
+
+  /* ── FDM nozzle cursor — horizontal orange bar ─────────────────────────── */
+  [data-process="fdm"] .mfg-cursor {
+    left: -4px;
+    right: -4px;
+    height: 3px;
+    top: 100%;   /* starts at bottom; JS updates `top` */
+    transform: translateY(-50%);
+    background: linear-gradient(
+      to right,
+      transparent            0%,
+      rgba(255, 95, 20, 0.82)  10%,
+      rgba(255, 205, 65, 1)    50%,
+      rgba(255, 95, 20, 0.82)  90%,
+      transparent            100%
+    );
+    box-shadow:
+      0 0 5px 2px rgba(255, 105, 30, 0.65),
+      0 -3px 10px 3px rgba(255, 75, 12, 0.30);
+  }
+</style>
+
+<script>
+(function () {
+  // Simple ease-in-out (quadratic)
+  function eio(t: number): number {
+    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+  }
+
+  function runReveal(el: HTMLElement) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const ov = el.querySelector<HTMLElement>('.mfg-overlay');
+      if (ov) { ov.style.opacity = '0'; ov.style.pointerEvents = 'none'; }
+      return;
+    }
+
+    const process  = el.dataset.process  as 'laser' | 'fdm' | 'sla';
+    const duration = parseFloat(el.dataset.duration  || '1.6') * 1000;
+    const delay    = parseFloat(el.dataset.delay     || '0.3') * 1000;
+    const bg       = el.dataset.bg || 'var(--graphite)';
+    const overlay  = el.querySelector<HTMLElement>('.mfg-overlay');
+    const cursor   = el.querySelector<HTMLElement>('.mfg-cursor');
+    if (!overlay || !cursor) return;
+
+    overlay.style.background = bg;
+
+    setTimeout(() => {
+      cursor.style.opacity = '1';
+      const t0 = performance.now();
+
+      function frame(now: number) {
+        const raw  = Math.min((now - t0) / duration, 1);
+        const pct  = eio(raw) * 100;
+
+        if (process === 'laser' || process === 'sla') {
+          overlay.style.clipPath = `inset(0 0 0 ${pct}%)`;
+          cursor.style.left = `${pct}%`;
+        } else if (process === 'fdm') {
+          // Overlay shrinks from the bottom up, revealing text below
+          overlay.style.clipPath = `inset(0 0 ${pct}% 0)`;
+          // Cursor rides the bottom edge of the overlay (= top of revealed area)
+          cursor.style.top = `calc(${100 - pct}% )`;
+        }
+
+        if (raw < 1) {
+          requestAnimationFrame(frame);
+        } else {
+          // Soft fade-out so the overlay doesn't pop
+          overlay.style.transition = 'opacity 0.18s ease-out';
+          overlay.style.opacity = '0';
+          cursor.style.transition = 'opacity 0.18s ease-out';
+          cursor.style.opacity = '0';
+          setTimeout(() => { overlay.style.display = 'none'; }, 200);
+        }
+      }
+
+      requestAnimationFrame(frame);
+    }, delay);
+  }
+
+  function init() {
+    document.querySelectorAll<HTMLElement>('.mfg-reveal').forEach(el => {
+      const trigger = el.dataset.trigger || 'load';
+      let started = false;
+
+      function start() {
+        if (started) return;
+        started = true;
+        runReveal(el);
+      }
+
+      if (trigger === 'scroll' && 'IntersectionObserver' in window) {
+        const obs = new IntersectionObserver(
+          entries => { entries.forEach(e => { if (e.isIntersecting) { start(); obs.unobserve(el); } }); },
+          { threshold: 0.2 }
+        );
+        obs.observe(el);
+      } else {
+        start();
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>

@@ -1,0 +1,181 @@
+---
+const NAV_LINKS = [
+  { href: '/',           label: 'Home'       },
+  { href: '/about',      label: 'About'      },
+  { href: '/research',   label: 'Research'   },
+  { href: '/equipment',  label: 'Equipment'  },
+  { href: '/blog',       label: 'Blog'       },
+  { href: '/awards',     label: 'Awards'     },
+  { href: '/contact',    label: 'Contact'    },
+  { href: '/website',   label: 'Website'    },
+];
+
+const { pathname } = Astro.url;
+---
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="/" class="wordmark" aria-label="Benjamin Davis — Home">
+      <span class="wordmark-name">Benjamin Davis</span>
+      <span class="wordmark-sub">Advanced Manufacturing</span>
+    </a>
+
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="site-nav" aria-label="Main navigation">
+      <ul role="list">
+        {NAV_LINKS.map(({ href, label }) => (
+          <li>
+            <a
+              href={href}
+              class:list={['nav-link', { active: pathname === href || (href !== '/' && pathname.startsWith(href)) }]}
+            >
+              {label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const toggle  = document.querySelector('.nav-toggle') as HTMLButtonElement;
+  const nav     = document.querySelector('.site-nav')   as HTMLElement;
+  const firstLink = nav?.querySelector('a') as HTMLAnchorElement | null;
+
+  function openMenu() {
+    toggle.setAttribute('aria-expanded', 'true');
+    nav.classList.add('open');
+    firstLink?.focus();
+  }
+
+  function closeMenu() {
+    toggle.setAttribute('aria-expanded', 'false');
+    nav.classList.remove('open');
+  }
+
+  toggle?.addEventListener('click', () => {
+    toggle.getAttribute('aria-expanded') === 'true' ? closeMenu() : openMenu();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && nav.classList.contains('open')) {
+      closeMenu();
+      toggle.focus();
+    }
+  });
+</script>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: var(--nav-height);
+    background: color-mix(in srgb, var(--graphite) 90%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
+    gap: 1rem;
+  }
+
+  /* Wordmark */
+  .wordmark {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+    color: var(--text);
+    flex-shrink: 0;
+  }
+  .wordmark-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .wordmark-sub {
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--steel);
+  }
+
+  /* Nav */
+  .site-nav ul {
+    display: flex;
+    list-style: none;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+  }
+
+  .nav-link {
+    display: block;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--steel);
+    border-radius: 3px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .nav-link:hover,
+  .nav-link.active {
+    color: var(--gold);
+    background: color-mix(in srgb, var(--gold) 8%, transparent);
+  }
+  .nav-link.active {
+    color: var(--gold);
+  }
+
+  /* Hamburger */
+  .nav-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.4rem;
+  }
+  .nav-toggle span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--steel);
+    border-radius: 2px;
+    transition: background 0.15s;
+  }
+  .nav-toggle:hover span { background: var(--gold); }
+
+  /* Mobile */
+  @media (max-width: 640px) {
+    .nav-toggle { display: flex; }
+
+    .site-nav {
+      display: none;
+      position: absolute;
+      top: var(--nav-height);
+      left: 0;
+      right: 0;
+      background: var(--panel);
+      border-bottom: 1px solid var(--panel-edge);
+      padding: 0.75rem 1.25rem 1rem;
+    }
+    .site-nav.open { display: block; }
+    .site-nav ul { flex-direction: column; gap: 0; }
+    .nav-link { font-size: 0.85rem; padding: 0.6rem 0.5rem; }
+  }
+</style>

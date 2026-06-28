@@ -1,0 +1,180 @@
+---
+import { getCollection }  from 'astro:content';
+import Layout              from '@/layouts/Layout.astro';
+import Lattice             from '@/components/Lattice.astro';
+import Bolt                from '@/components/Bolt.astro';
+import CastingText         from '@/components/CastingText.astro';
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<Layout
+  title="Blog — Benjamin Davis"
+  description="Writing on advanced manufacturing, independent research, science fair strategy, and building things from scratch."
+>
+
+  <!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+  <section class="hero">
+    <Lattice />
+    <Bolt position="tl" /><Bolt position="tr" /><Bolt position="bl" /><Bolt position="br" />
+    <div class="container hero-body">
+      <p class="overline">Blog</p>
+      <CastingText id="blog-hero" duration={3.5} delay={0.4} metal="bronze" mold="sand">
+        <h1 class="bl-heading">Field<br />Notes</h1>
+      </CastingText>
+      <p class="bl-sub">
+        Engineering updates, research reflections, and lessons from building things that don't exist yet.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Post grid or empty state ─────────────────────────────────────────── -->
+  <section class="bl-content">
+    <div class="container">
+      {posts.length === 0 ? (
+        <div class="bl-empty">
+          <p class="bl-empty-label">// 00 posts</p>
+          <p class="bl-empty-msg">First post in progress — check back soon.</p>
+          <p class="bl-empty-hint">
+            In the meantime, read about the research on the{' '}
+            <a href="/research">Research page</a>.
+          </p>
+        </div>
+      ) : (
+        <ul class="post-list" role="list">
+          {posts.map(post => (
+            <li class="post-card">
+              <a href={`/blog/${post.slug}`} class="post-link">
+                <div class="post-meta">
+                  <time class="post-date" datetime={post.data.pubDate.toISOString()}>
+                    {post.data.pubDate.toLocaleDateString('en-US', {
+                      year: 'numeric', month: 'short', day: 'numeric',
+                    })}
+                  </time>
+                  {post.data.tags.length > 0 && (
+                    <div class="post-tags" aria-label="Tags">
+                      {post.data.tags.slice(0, 3).map(t => (
+                        <span class="post-tag">{t}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <h2 class="post-title">{post.data.title}</h2>
+                {post.data.description && (
+                  <p class="post-desc">{post.data.description}</p>
+                )}
+                <span class="post-read" aria-hidden="true">Read →</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  /* ── Hero ──────────────────────────────────────────────────────────────── */
+  .hero {
+    position: relative; overflow: hidden;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-edge);
+    padding: 6rem 0 4.5rem;
+  }
+  .hero-body { position: relative; z-index: 2; }
+  .overline {
+    font: 500 0.72rem / 1 var(--font-mono);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--copper); margin-bottom: 1.2rem;
+  }
+  .bl-heading {
+    font: 900 clamp(3.4rem, 10vw, 7.2rem) / 0.96 var(--font-head);
+    letter-spacing: -0.02em; text-transform: uppercase;
+    color: var(--text); margin: 0 0 1.6rem;
+  }
+  .bl-sub {
+    font: 400 1.05rem / 1.6 var(--font-body);
+    color: var(--steel); max-width: 46ch;
+    margin: 0;
+  }
+
+  /* ── Content section ───────────────────────────────────────────────────── */
+  .bl-content { padding: 4rem 0 6rem; }
+
+  /* ── Empty state ───────────────────────────────────────────────────────── */
+  .bl-empty {
+    border: 1px dashed var(--panel-edge);
+    background: var(--panel);
+    padding: 3.5rem 2.5rem;
+    max-width: 540px;
+  }
+  .bl-empty-label {
+    font: 400 0.75rem / 1 var(--font-mono);
+    letter-spacing: 0.1em; color: var(--copper);
+    margin: 0 0 1.1rem;
+  }
+  .bl-empty-msg {
+    font: 600 1.2rem / 1.4 var(--font-body);
+    color: var(--text); margin: 0 0 0.8rem;
+  }
+  .bl-empty-hint {
+    font: 400 0.9rem / 1.55 var(--font-body);
+    color: var(--steel); margin: 0;
+  }
+  .bl-empty-hint a {
+    color: var(--copper); text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .bl-empty-hint a:hover { color: var(--gold); }
+
+  /* ── Post list ─────────────────────────────────────────────────────────── */
+  .post-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .post-card { border-bottom: 1px solid var(--panel-edge); }
+  .post-card:first-child { border-top: 1px solid var(--panel-edge); }
+  .post-link {
+    display: block; padding: 2rem 0;
+    text-decoration: none; color: inherit;
+    transition: background 0.15s;
+  }
+  .post-link:hover { background: var(--panel); padding-left: 1.2rem; padding-right: 1.2rem; margin: 0 -1.2rem; }
+  .post-link:focus-visible {
+    outline: 2px solid var(--copper); outline-offset: 3px;
+  }
+  .post-meta {
+    display: flex; align-items: center; gap: 1rem;
+    margin-bottom: 0.7rem;
+  }
+  .post-date {
+    font: 400 0.75rem / 1 var(--font-mono);
+    letter-spacing: 0.06em; color: var(--steel);
+  }
+  .post-tags { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .post-tag {
+    font: 500 0.68rem / 1 var(--font-mono);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--copper); border: 1px solid var(--gold-dim);
+    padding: 0.2em 0.5em;
+  }
+  .post-title {
+    font: 700 1.55rem / 1.2 var(--font-head);
+    letter-spacing: -0.01em; text-transform: uppercase;
+    color: var(--text); margin: 0 0 0.55rem;
+  }
+  .post-link:hover .post-title { color: var(--gold-bright); }
+  .post-desc {
+    font: 400 0.92rem / 1.55 var(--font-body);
+    color: var(--steel); margin: 0 0 0.85rem;
+    max-width: 62ch;
+  }
+  .post-read {
+    font: 500 0.78rem / 1 var(--font-mono);
+    letter-spacing: 0.08em; color: var(--copper);
+    text-transform: uppercase;
+  }
+
+  /* ── Shared ────────────────────────────────────────────────────────────── */
+  .container { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
+  @media (max-width: 600px) { .bl-heading { font-size: clamp(3rem, 18vw, 4.5rem); } }
+</style>

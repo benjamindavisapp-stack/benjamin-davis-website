@@ -1,0 +1,880 @@
+---
+import ProjectLayout from '@/layouts/ProjectLayout.astro';
+import Bolt from '@/components/Bolt.astro';
+---
+
+<ProjectLayout
+  title="From Crude to Extrude"
+  subtitle="Flagship Research · ISEF 2025"
+  role="Lead Researcher & Engineer"
+  year="2024–2025"
+  tags={[
+    'Additive Manufacturing',
+    'Recycling',
+    'Mechanical Engineering',
+    'Electrical Engineering',
+    'Systems Engineering',
+    'Materials Science',
+    'ISEF 2025',
+  ]}
+  overview="A desktop system combining pultrusion and extrusion into a single machine — recycling PET bottle waste and 3D-printing purge material into additive-manufacturing filament within commercial tolerances, at roughly one-tenth the commercial cost. Built in an at-home workshop over 800 hours, without formal training, using basic tools."
+  specs={[
+    { key: 'Development time',     value: '800+ hrs' },
+    { key: 'Months of build',      value: '8' },
+    { key: 'Component iterations', value: '50+' },
+    { key: 'CAD-designed parts',   value: '30+' },
+    { key: 'Integrated sub-systems', value: '7' },
+    { key: 'Energy improvement',   value: '43%' },
+    { key: 'Particulate reduction', value: '5×' },
+    { key: 'Cost vs. commercial',  value: '~90% cheaper' },
+  ]}
+  nextProject={{ title: 'Tactile Learning Tiles', href: '/research' }}
+  description="Full technical detail on 'From Crude to Extrude' — the ISEF 2025 Regeneron Young Scientist Award-winning desktop plastic recycling system by Benjamin Davis."
+>
+
+  <!-- ── The Problem ─────────────────────────────────────────────────────── -->
+  <section class="proj-section">
+    <div class="container">
+      <p class="overline">The Problem</p>
+      <h2 class="section-h2">Plastic waste, expensive filament, and a gap in between</h2>
+
+      <div class="two-col">
+        <div>
+          <p class="body-text">
+            PET (polyethylene terephthalate) plastic — the material in every clear water bottle —
+            is one of the most ubiquitous waste streams on the planet. It's also technically
+            recyclable. But in practice, the energy cost and equipment required to re-process it
+            into something useful makes small-scale recycling impractical for individuals and
+            schools.
+          </p>
+          <p class="body-text">
+            On the other side of the lab bench: commercial 3D-printing filament costs $20–30/kg,
+            and every time a printer changes colors it purges material — hundreds of grams of
+            clean plastic discarded as waste. No affordable consumer path existed to close
+            that loop.
+          </p>
+          <p class="body-text">
+            The question I kept returning to: what would it take to build a machine that
+            turns those two waste streams into each other's solution?
+          </p>
+        </div>
+
+        <div class="problem-stats">
+          <div class="stat-item">
+            <span class="stat-val">$20–30</span>
+            <span class="stat-key">Per kg — commercial filament cost</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val">&lt;$3</span>
+            <span class="stat-key">Per kg — this machine's production cost</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val">PET</span>
+            <span class="stat-key">Primary input: bottle waste &amp; 3D purge material</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── The System ─────────────────────────────────────────────────────── -->
+  <section class="proj-section proj-section--dark">
+    <div class="container">
+      <p class="overline">The System</p>
+      <h2 class="section-h2">A novel integration of extrusion and pultrusion</h2>
+
+      <div class="system-grid">
+        <div class="system-images">
+          <div class="img-frame">
+            <img
+              src="/images/machine-full.jpg"
+              alt="Full From Crude to Extrude system on display at ISEF 2025"
+              width="800"
+              height="600"
+              loading="lazy"
+              decoding="async"
+            />
+            <Bolt position="tl" size={14} />
+            <Bolt position="tr" size={14} />
+            <span class="img-caption">Full system &middot; ISEF 2025 display</span>
+          </div>
+
+          <div class="img-frame">
+            <img
+              src="/images/machine-detail-auger.jpg"
+              alt="Internal components of the recycling machine, showing wiring and subsystem integration"
+              width="800"
+              height="600"
+              loading="lazy"
+              decoding="async"
+            />
+            <span class="img-caption">Internal view &middot; wiring &amp; sub-system integration</span>
+          </div>
+        </div>
+
+        <div class="system-content">
+          <p class="body-text">
+            Standard filament recycling uses re-extrusion: melt plastic, push it through a die,
+            cool it, spool it. The problem is that each thermal cycle degrades the material and
+            consumes significant energy for repeated heating. I developed a different approach —
+            a novel combination of extrusion and pultrusion that processes material in a single
+            pass, reducing thermal cycles and the energy overhead that goes with them.
+          </p>
+
+          <p class="body-text">
+            The result is a machine with seven integrated sub-systems — spanning electrical,
+            mechanical, and chemical engineering — designed entirely in Fusion 360, with 30+
+            manufactured parts and 50+ iterated components. Every sub-system had to communicate
+            with the others precisely; a tolerance failure in one propagated through the whole
+            chain.
+          </p>
+
+          <div class="subsystem-table" role="table" aria-label="Integrated sub-systems">
+            <p class="sub-table-header">7 Integrated Sub-systems</p>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">01</span>
+              <span class="spec-val" role="cell">Material feeding &amp; preparation</span>
+            </div>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">02</span>
+              <span class="spec-val" role="cell">Thermal control &amp; heating barrel</span>
+            </div>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">03</span>
+              <span class="spec-val" role="cell">Auger &amp; extrusion mechanism</span>
+            </div>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">04</span>
+              <span class="spec-val" role="cell">Pultrusion assembly (novel integration)</span>
+            </div>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">05</span>
+              <span class="spec-val" role="cell">Active cooling &amp; filament forming</span>
+            </div>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">06</span>
+              <span class="spec-val" role="cell">Diameter measurement &amp; feedback control</span>
+            </div>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">07</span>
+              <span class="spec-val" role="cell">Motorized spooling &amp; tensioning</span>
+            </div>
+          </div>
+
+          <!-- Placeholder: system diagram -->
+          <figure
+            class="diagram-placeholder"
+            data-label="[Diagram: system schematic / sub-system flow — provide engineering drawing or block diagram]"
+            aria-label="System diagram placeholder"
+          >
+            <figcaption>System schematic &mdash; diagram to be added</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Results ────────────────────────────────────────────────────────── -->
+  <section class="proj-section">
+    <div class="container">
+      <p class="overline">Results</p>
+      <h2 class="section-h2">Measured against the standard</h2>
+
+      <p class="body-text" style="max-width:640px; margin-bottom:2rem;">
+        All figures measured against standard extrusion and re-extrusion baseline processes.
+        Filament diameter tested against commercial specification of ±0.05&thinsp;mm.
+      </p>
+
+      <div class="results-table" role="table" aria-label="Quantitative results">
+        <div class="results-header" role="row" aria-hidden="true">
+          <span role="columnheader">Metric</span>
+          <span role="columnheader">Result</span>
+          <span role="columnheader">vs. Standard Process</span>
+        </div>
+
+        <div class="results-row" role="row">
+          <span class="results-metric" role="rowheader">Energy Efficiency</span>
+          <span class="results-value copper" role="cell">43% better</span>
+          <span class="results-note" role="cell">Fewer thermal cycles; single-pass processing</span>
+        </div>
+
+        <div class="results-row" role="row">
+          <span class="results-metric" role="rowheader">Particulate Matter</span>
+          <span class="results-value copper" role="cell">5&times; less</span>
+          <span class="results-note" role="cell">Reduced material degradation through lower thermal exposure</span>
+        </div>
+
+        <div class="results-row" role="row">
+          <span class="results-metric" role="rowheader">Filament Tolerance</span>
+          <span class="results-value gold" role="cell">100% within spec</span>
+          <span class="results-note" role="cell">Meets commercial ±0.05&thinsp;mm diameter standard</span>
+        </div>
+
+        <div class="results-row" role="row">
+          <span class="results-metric" role="rowheader">Production Cost</span>
+          <span class="results-value gold" role="cell">~90% cheaper</span>
+          <span class="results-note" role="cell">vs. commercial filament at ~$20–30/kg</span>
+        </div>
+      </div>
+
+      <!-- Placeholder: results chart -->
+      <figure
+        class="diagram-placeholder"
+        style="margin-top:2rem;"
+        data-label="[Chart: energy vs. particulate comparison bar chart — provide data for final chart]"
+        aria-label="Results chart placeholder"
+      >
+        <figcaption>Comparison chart &mdash; to be added with final data</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ── The Process ────────────────────────────────────────────────────── -->
+  <section class="proj-section proj-section--dark">
+    <div class="container">
+      <p class="overline">The Process</p>
+      <h2 class="section-h2">800 hours in an at-home workshop</h2>
+
+      <div class="process-grid">
+        <div class="process-image">
+          <div class="img-frame">
+            <img
+              src="/images/workshop.jpg"
+              alt="Benjamin Davis working in his at-home workshop with grinding sparks"
+              width="800"
+              height="1000"
+              loading="lazy"
+              decoding="async"
+            />
+            <span class="img-caption">At-home workshop &middot; Wrentham, MA</span>
+          </div>
+        </div>
+
+        <div class="process-text">
+          <p class="body-text">
+            The machine was built with basic tools in a garage workshop in Wrentham, without
+            formal training in machining, electronics design, or chemical engineering. Every
+            sub-system was learned from scratch — datasheets, research papers, trial runs,
+            and a lot of iterations that didn't work.
+          </p>
+          <p class="body-text">
+            The 50+ component revisions aren't a design flaw — they're the record of a real
+            engineering process. Each failure pointed to something specific: a tolerance that
+            was off, a thermal property I hadn't accounted for, a mechanical interface that
+            needed redesign. I documented everything, because if the process isn't documented,
+            it didn't happen.
+          </p>
+          <p class="body-text">
+            8 months. Consecutive all-nighters. Missed weekends. The machine took that long
+            to get right, and it was worth the time.
+          </p>
+
+          <div class="process-stats" role="table" aria-label="Process statistics">
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">Timeline</span>
+              <span class="spec-val" role="cell">8 months, sophomore–junior year</span>
+            </div>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">Total hours</span>
+              <span class="spec-val" role="cell">800+ logged hours</span>
+            </div>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">Location</span>
+              <span class="spec-val" role="cell">At-home workshop, Wrentham, MA</span>
+            </div>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">Tools</span>
+              <span class="spec-val" role="cell">Basic hand tools &amp; shop equipment; no CNC mill</span>
+            </div>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">CAD</span>
+              <span class="spec-val" role="cell">Fusion 360 — 30+ designed &amp; manufactured parts</span>
+            </div>
+            <div class="spec-row" role="row">
+              <span class="spec-key" role="rowheader">Training</span>
+              <span class="spec-val" role="cell">Self-taught across all engineering domains</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Recognition ───────────────────────────────────────────────────── -->
+  <section class="proj-section">
+    <div class="container">
+      <p class="overline">Recognition</p>
+      <h2 class="section-h2">ISEF 2025 and beyond</h2>
+
+      <div class="recognition-grid">
+        <div class="recognition-featured">
+          <div class="img-frame">
+            <img
+              src="/images/isef-booth.jpg"
+              alt="Benjamin Davis at his ISEF 2025 booth in Columbus, Ohio"
+              width="800"
+              height="1000"
+              loading="lazy"
+              decoding="async"
+            />
+            <span class="img-caption">ISEF 2025 &middot; Columbus, OH &middot; May 2025</span>
+          </div>
+        </div>
+
+        <div class="awards-list">
+          <div class="award-block award-block--primary">
+            <p class="award-name">Regeneron Young Scientist Award</p>
+            <p class="award-event">ISEF 2025 &middot; Columbus, OH</p>
+            <p class="award-note">
+              One of two students worldwide. 2nd highest overall score at the
+              world's largest pre-college science fair.
+            </p>
+            <p class="award-value">$75,000 scholarship</p>
+          </div>
+
+          <div class="award-block">
+            <p class="award-name">1st Place — Engineering Technology: Statics &amp; Dynamics</p>
+            <p class="award-event">ISEF 2025</p>
+          </div>
+
+          <div class="award-block">
+            <p class="award-name">1st Place</p>
+            <p class="award-event">Massachusetts State Science &amp; Engineering Fair</p>
+          </div>
+
+          <div class="award-block">
+            <p class="award-name">AMD Engineering Excellence Award</p>
+            <p class="award-event">Massachusetts State Science Fair &amp; Region III Science Fair</p>
+          </div>
+
+          <div class="award-block">
+            <p class="award-name">1st Place &amp; Excellence in Visual Presentation</p>
+            <p class="award-event">Bishop Feehan High School Science Fair</p>
+          </div>
+
+          <div class="award-block">
+            <p class="award-name">Masason Foundation</p>
+            <p class="award-event">Global fellowship &mdash; sought out by the Secretariat</p>
+          </div>
+
+          <div class="award-block">
+            <p class="award-name">AJAS Fellow / AAAS Conference</p>
+            <p class="award-event">American Junior Academy of Science &middot; 2026</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── What's Next ───────────────────────────────────────────────────── -->
+  <section class="proj-section proj-section--dark">
+    <div class="container">
+      <p class="overline">What's Next</p>
+      <h2 class="section-h2">The research continues</h2>
+
+      <div class="next-table" role="table" aria-label="Future research directions">
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Composite filament</span>
+          <span class="spec-val" role="cell">
+            Coaxial hollow double-material water-cooled auger for composite extrusion (e.g., PEEK+PLA)
+          </span>
+        </div>
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Metal extrusion</span>
+          <span class="spec-val" role="cell">
+            Aluminum bar extrusion at maker scale — bringing metal forming out of the factory
+          </span>
+        </div>
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Benchmarking</span>
+          <span class="spec-val" role="cell">
+            Rigorous comparison against commercial filament production solutions
+          </span>
+        </div>
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">IP</span>
+          <span class="spec-val" role="cell">
+            Patenting the extrusion-pultrusion combination method
+          </span>
+        </div>
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Deployment</span>
+          <span class="spec-val" role="cell">
+            Commercialization and implementation in schools and makerspaces
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Photo gallery ─────────────────────────────────────────────────── -->
+  <section class="proj-section">
+    <div class="container">
+      <p class="overline">Gallery</p>
+      <h2 class="section-h2">From the build and competition</h2>
+
+      <div class="gallery-grid">
+        <div class="gallery-item">
+          <img
+            src="/images/isef-award.jpg"
+            alt="Benjamin Davis at his science fair display board with the machine"
+            width="800"
+            height="600"
+            loading="lazy"
+            decoding="async"
+          />
+          <p class="gallery-caption">Science fair display &middot; State competition</p>
+        </div>
+
+        <div class="gallery-item">
+          <img
+            src="/images/machine-detail-auger.jpg"
+            alt="Detailed view of the machine internals showing wiring and subsystem components"
+            width="800"
+            height="600"
+            loading="lazy"
+            decoding="async"
+          />
+          <p class="gallery-caption">Internal wiring &amp; sub-system integration</p>
+        </div>
+
+        <!-- Placeholder: filament output close-up -->
+        <figure
+          class="gallery-item gallery-placeholder"
+          data-label="[Photo: machine-detail-filament.jpg — close-up of filament output/spool · 1200×800]"
+          role="img"
+          aria-label="Filament output photo — not yet provided"
+        >
+          <figcaption>Filament output &mdash; photo coming soon</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+</ProjectLayout>
+
+<style>
+  /* ── Section wrappers ────────────────────────────────────────────────────── */
+  .proj-section {
+    padding-block: 4.5rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .proj-section--dark {
+    background: var(--panel);
+  }
+
+  .overline {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+    margin-bottom: 0.4rem;
+  }
+
+  .section-h2 {
+    font-family: var(--font-head);
+    font-size: clamp(1.6rem, 5vw, 2.6rem);
+    font-weight: 900;
+    color: var(--text);
+    margin-bottom: 2rem;
+    line-height: 1.05;
+  }
+
+  .body-text {
+    font-size: 0.95rem;
+    line-height: 1.78;
+    color: var(--text);
+    margin-bottom: 1.1rem;
+  }
+  .body-text:last-child { margin-bottom: 0; }
+
+  /* ── Shared spec rows ────────────────────────────────────────────────────── */
+  .spec-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .spec-row:last-child { border-bottom: none; }
+
+  .spec-key {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--copper);
+    padding: 0.65rem 0.75rem;
+    border-right: 1px solid var(--panel-edge);
+    display: flex;
+    align-items: flex-start;
+    padding-top: 0.7rem;
+    background: color-mix(in srgb, var(--graphite) 40%, var(--panel));
+  }
+
+  .spec-val {
+    font-size: 0.82rem;
+    color: var(--text);
+    padding: 0.65rem 0.85rem;
+    line-height: 1.55;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 0.7rem;
+  }
+
+  /* ── Image frame ─────────────────────────────────────────────────────────── */
+  .img-frame {
+    position: relative;
+    border: 1px solid var(--panel-edge);
+    overflow: hidden;
+  }
+
+  .img-frame img {
+    width: 100%;
+    display: block;
+    object-fit: cover;
+    filter: brightness(0.88) contrast(1.07);
+  }
+
+  .img-caption {
+    display: block;
+    padding: 0.3rem 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+    background: color-mix(in srgb, var(--graphite) 90%, transparent);
+    border-top: 1px solid var(--panel-edge);
+  }
+
+  /* ── Diagram / chart placeholders ───────────────────────────────────────── */
+  .diagram-placeholder {
+    border: 1px dashed var(--panel-edge);
+    padding: 3rem 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: var(--panel);
+  }
+
+  .diagram-placeholder::before {
+    content: attr(data-label);
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    color: var(--steel);
+    opacity: 0.55;
+    text-align: center;
+  }
+
+  .diagram-placeholder figcaption {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--panel-edge);
+    font-style: italic;
+  }
+
+  /* ── The Problem ─────────────────────────────────────────────────────────── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    gap: 3rem;
+    align-items: start;
+  }
+
+  .problem-stats {
+    border: 1px solid var(--panel-edge);
+    overflow: hidden;
+  }
+
+  .stat-item {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .stat-item:last-child { border-bottom: none; }
+
+  .stat-val {
+    font-family: var(--font-head);
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: var(--gold);
+    line-height: 1;
+  }
+
+  .stat-key {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--steel);
+    line-height: 1.4;
+  }
+
+  @media (max-width: 640px) {
+    .two-col { grid-template-columns: 1fr; }
+  }
+
+  /* ── The System ──────────────────────────────────────────────────────────── */
+  .system-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+
+  .system-images {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .subsystem-table {
+    border: 1px solid var(--panel-edge);
+    margin-block: 1.5rem;
+  }
+
+  .sub-table-header {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--copper);
+    padding: 0.5rem 0.75rem;
+    background: color-mix(in srgb, var(--graphite) 80%, var(--panel));
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  @media (max-width: 700px) {
+    .system-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Results table ───────────────────────────────────────────────────────── */
+  .results-table {
+    border: 1px solid var(--panel-edge);
+  }
+
+  .results-header {
+    display: grid;
+    grid-template-columns: 180px 140px 1fr;
+    padding: 0.5rem 0;
+    border-bottom: 2px solid var(--panel-edge);
+    background: color-mix(in srgb, var(--graphite) 70%, var(--panel));
+  }
+
+  .results-header span {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--copper);
+    padding: 0 0.85rem;
+  }
+
+  .results-row {
+    display: grid;
+    grid-template-columns: 180px 140px 1fr;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .results-row:last-child { border-bottom: none; }
+
+  .results-metric {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--steel);
+    padding: 0.85rem;
+    border-right: 1px solid var(--panel-edge);
+    display: flex;
+    align-items: center;
+  }
+
+  .results-value {
+    font-family: var(--font-head);
+    font-size: 1.4rem;
+    font-weight: 900;
+    line-height: 1;
+    padding: 0.75rem 0.85rem;
+    border-right: 1px solid var(--panel-edge);
+    display: flex;
+    align-items: center;
+  }
+
+  .results-value.copper { color: var(--copper); }
+  .results-value.gold   { color: var(--gold);   }
+
+  .results-note {
+    font-size: 0.78rem;
+    color: var(--steel);
+    padding: 0.85rem;
+    line-height: 1.5;
+    display: flex;
+    align-items: center;
+  }
+
+  @media (max-width: 640px) {
+    .results-header { display: none; }
+    .results-row { grid-template-columns: 100px 100px 1fr; }
+  }
+
+  @media (max-width: 480px) {
+    .results-row { grid-template-columns: 1fr; }
+    .results-metric { border-right: none; border-bottom: 1px solid var(--panel-edge); }
+    .results-value  { border-right: none; border-bottom: 1px solid var(--panel-edge); font-size: 2rem; }
+  }
+
+  /* ── Process ─────────────────────────────────────────────────────────────── */
+  .process-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+
+  .process-stats {
+    border: 1px solid var(--panel-edge);
+    margin-top: 1.5rem;
+  }
+
+  @media (max-width: 700px) {
+    .process-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Recognition ─────────────────────────────────────────────────────────── */
+  .recognition-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+
+  .awards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--panel-edge);
+  }
+
+  .award-block {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--panel-edge);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .award-block:last-child { border-bottom: none; }
+
+  .award-block--primary {
+    background: color-mix(in srgb, var(--gold-dim) 15%, var(--panel));
+  }
+
+  .award-name {
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 900;
+    color: var(--text);
+    line-height: 1.1;
+  }
+
+  .award-event {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+
+  .award-note {
+    font-size: 0.78rem;
+    color: var(--steel);
+    line-height: 1.55;
+    margin-top: 0.1rem;
+  }
+
+  .award-value {
+    font-family: var(--font-head);
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: var(--gold);
+    margin-top: 0.2rem;
+  }
+
+  @media (max-width: 680px) {
+    .recognition-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── What's Next ─────────────────────────────────────────────────────────── */
+  .next-table {
+    border: 1px solid var(--panel-edge);
+  }
+
+  /* ── Gallery ─────────────────────────────────────────────────────────────── */
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1px;
+    background: var(--panel-edge);
+    border: 1px solid var(--panel-edge);
+  }
+
+  .gallery-item {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gallery-item img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    filter: brightness(0.85) contrast(1.07);
+    display: block;
+  }
+
+  .gallery-caption {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+    padding: 0.4rem 0.6rem;
+    background: var(--panel);
+    border-top: 1px solid var(--panel-edge);
+  }
+
+  .gallery-placeholder {
+    background: var(--panel);
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem;
+    border: none;
+  }
+
+  .gallery-placeholder::before {
+    content: attr(data-label);
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--steel);
+    opacity: 0.5;
+    text-align: center;
+    letter-spacing: 0.06em;
+  }
+
+  .gallery-placeholder figcaption {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--panel-edge);
+    font-style: italic;
+  }
+</style>

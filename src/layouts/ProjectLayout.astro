@@ -1,0 +1,343 @@
+---
+/**
+ * ProjectLayout — reusable wrapper for every project detail page.
+ *
+ * Usage in a detail page:
+ *
+ *   <ProjectLayout
+ *     title="Project Name"
+ *     subtitle="Optional section label"
+ *     role="Lead Engineer"
+ *     year="2024–2025"
+ *     tags={["Tag A", "Tag B"]}
+ *     overview="One-paragraph summary shown in the lead panel."
+ *     specs={[
+ *       { key: "Hours", value: "800+" },
+ *       { key: "Iterations", value: "50+" },
+ *     ]}
+ *     prevProject={{ title: "Prev Project", href: "/research/prev" }}
+ *     nextProject={{ title: "Next Project", href: "/research/next" }}
+ *   >
+ *     <!-- custom sections go here via the default slot -->
+ *   </ProjectLayout>
+ */
+
+import Layout from '@/layouts/Layout.astro';
+import Lattice from '@/components/Lattice.astro';
+import Bolt    from '@/components/Bolt.astro';
+
+interface Spec {
+  key: string;
+  value: string;
+}
+interface NavProject {
+  title: string;
+  href: string;
+}
+interface Props {
+  title: string;
+  subtitle?: string;
+  role: string;
+  year: string;
+  tags: string[];
+  overview: string;
+  specs?: Spec[];
+  prevProject?: NavProject;
+  nextProject?: NavProject;
+  ogImage?: string;
+  description?: string;
+}
+
+const {
+  title,
+  subtitle,
+  role,
+  year,
+  tags,
+  overview,
+  specs = [],
+  prevProject,
+  nextProject,
+  ogImage,
+  description,
+} = Astro.props;
+---
+
+<Layout
+  title={`${title} — Benjamin Davis`}
+  description={description ?? overview}
+  ogImage={ogImage}
+>
+
+  <!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+  <section class="proj-hero">
+    <Lattice />
+    <Bolt position="tl" />
+    <Bolt position="tr" />
+    <Bolt position="bl" />
+    <Bolt position="br" />
+
+    <div class="container proj-hero-body">
+      <a href="/research" class="proj-back">&larr; Research &amp; Projects</a>
+
+      {subtitle && <p class="proj-subtitle-label">{subtitle}</p>}
+
+      <h1 class="proj-title">{title}</h1>
+
+      <div class="proj-meta">
+        <span class="proj-role">{role}</span>
+        <span class="proj-sep" aria-hidden="true">&middot;</span>
+        <span class="proj-year">{year}</span>
+      </div>
+
+      <div class="proj-tags" aria-label="Tags">
+        {tags.map(tag => <span class="proj-tag">{tag}</span>)}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Overview ──────────────────────────────────────────────────────────── -->
+  <section class="proj-overview">
+    <div class="container">
+      <p class="proj-overview-text">{overview}</p>
+    </div>
+  </section>
+
+  <!-- ── By the numbers ────────────────────────────────────────────────────── -->
+  {specs.length > 0 && (
+    <section class="proj-numbers">
+      <div class="container">
+        <p class="overline">By the Numbers</p>
+        <div class="numbers-grid">
+          {specs.map(s => (
+            <div class="number-cell">
+              <span class="number-val">{s.value}</span>
+              <span class="number-key">{s.key}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- ── Custom project content ─────────────────────────────────────────────  -->
+  <div class="proj-body">
+    <slot />
+  </div>
+
+  <!-- ── Prev / Next nav ───────────────────────────────────────────────────── -->
+  {(prevProject || nextProject) && (
+    <nav class="proj-nav" aria-label="Project navigation">
+      <div class="container proj-nav-inner">
+        {prevProject
+          ? (
+            <a href={prevProject.href} class="proj-nav-link">
+              <span class="proj-nav-dir">&larr; Previous</span>
+              <span class="proj-nav-title">{prevProject.title}</span>
+            </a>
+          )
+          : <div aria-hidden="true" />
+        }
+        {nextProject
+          ? (
+            <a href={nextProject.href} class="proj-nav-link proj-nav-link--right">
+              <span class="proj-nav-dir">Next &rarr;</span>
+              <span class="proj-nav-title">{nextProject.title}</span>
+            </a>
+          )
+          : <div aria-hidden="true" />
+        }
+      </div>
+    </nav>
+  )}
+
+</Layout>
+
+<style>
+  /* ── Hero ──────────────────────────────────────────────────────────────── */
+  .proj-hero {
+    position: relative;
+    padding-block: 4.5rem 3.5rem;
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .proj-hero-body {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    max-width: 720px;
+  }
+
+  .proj-back {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+    text-decoration: none;
+    transition: color 0.15s;
+    align-self: flex-start;
+  }
+  .proj-back:hover { color: var(--gold); }
+
+  .proj-subtitle-label {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+
+  .proj-title {
+    font-family: var(--font-head);
+    font-size: clamp(2.4rem, 8vw, 4.2rem);
+    font-weight: 900;
+    line-height: 0.93;
+    color: var(--text);
+  }
+
+  .proj-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+  }
+
+  .proj-role   { color: var(--gold); }
+  .proj-sep    { color: var(--panel-edge); }
+  .proj-year   { color: var(--steel); }
+
+  .proj-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.2rem;
+  }
+
+  .proj-tag {
+    display: inline-block;
+    padding: 0.18rem 0.55rem;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    border: 1px solid var(--panel-edge);
+    color: var(--steel);
+    border-radius: 2px;
+  }
+
+  /* ── Overview ────────────────────────────────────────────────────────────── */
+  .proj-overview {
+    padding-block: 2.5rem;
+    border-bottom: 1px solid var(--panel-edge);
+    background: var(--panel);
+  }
+
+  .proj-overview-text {
+    font-size: 1.05rem;
+    line-height: 1.78;
+    color: var(--text);
+    max-width: 700px;
+  }
+
+  /* ── By the numbers ──────────────────────────────────────────────────────── */
+  .proj-numbers {
+    padding-block: 3rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .overline {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+    margin-bottom: 1.25rem;
+  }
+
+  .numbers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 1px;
+    background: var(--panel-edge);
+    border: 1px solid var(--panel-edge);
+  }
+
+  .number-cell {
+    background: var(--panel);
+    padding: 1.25rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .number-val {
+    font-family: var(--font-head);
+    font-size: clamp(1.7rem, 4.5vw, 2.4rem);
+    font-weight: 900;
+    line-height: 1;
+    color: var(--gold);
+  }
+
+  .number-key {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+    line-height: 1.4;
+  }
+
+  /* ── Body slot ───────────────────────────────────────────────────────────── */
+  .proj-body {
+    /* Each project's custom sections slot in here */
+  }
+
+  /* ── Prev / Next ─────────────────────────────────────────────────────────── */
+  .proj-nav {
+    padding-block: 2rem;
+    border-top: 1px solid var(--panel-edge);
+    background: var(--panel);
+  }
+
+  .proj-nav-inner {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .proj-nav-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-decoration: none;
+    max-width: 300px;
+  }
+
+  .proj-nav-link--right {
+    align-items: flex-end;
+    text-align: right;
+  }
+
+  .proj-nav-dir {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+
+  .proj-nav-title {
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    transition: color 0.15s;
+  }
+
+  .proj-nav-link:hover .proj-nav-title { color: var(--gold); }
+</style>

@@ -1,0 +1,599 @@
+---
+// CastingText.astro — Sand/investment casting text treatment.
+// Molten metal fills letter-shaped mold cavities, solidifies, mold falls away.
+interface Props {
+  duration?: number;
+  delay?:    number;
+  trigger?:  'scroll' | 'load';
+  metal?:    'bronze' | 'aluminum' | 'iron';
+  mold?:     'sand' | 'investment';
+  id?:       string;
+  class?:    string;
+}
+const {
+  duration = 3.5,
+  delay    = 0.25,
+  trigger  = 'scroll',
+  metal    = 'bronze',
+  mold     = 'sand',
+  id,
+  class: cls,
+} = Astro.props;
+const castId = id ?? ('ct-' + Math.random().toString(36).slice(2, 8));
+---
+
+<div
+  class:list={['cast-wrap', cls]}
+  data-ct-duration={String(duration)}
+  data-ct-delay={String(delay)}
+  data-ct-trigger={trigger}
+  data-ct-metal={metal}
+  data-ct-mold={mold}
+  data-ct-id={castId}
+>
+  <slot />
+  <canvas class="cast-bed" aria-hidden="true"></canvas>
+  <canvas class="cast-fx"  aria-hidden="true"></canvas>
+</div>
+
+<style>
+  .cast-wrap { position: relative; display: block; }
+  .cast-bed, .cast-fx {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none; display: block;
+  }
+  .cast-bed { z-index: 10; }
+  .cast-fx  { z-index: 11; }
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let nActive   = 0;
+  const MAX_ACT = 2;
+  const MAX_SAND = 260;
+  const SPRUE_LEN = 16; // px, stub above first letter top
+
+  function mk(w: number, h: number): HTMLCanvasElement {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; return c;
+  }
+  function eio(t: number) { return t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t; }
+  function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
+
+  /* ── Metal color tables ───────────────────────────────────────────────── */
+  const METAL_COLORS: Record<string, [string, string, string, string]> = {
+    bronze:   ['#c89860', '#a07840', '#7a5428', '#503818'],
+    aluminum: ['#c4ccd6', '#96a0ac', '#687480', '#485460'],
+    iron:     ['#8890a0', '#606870', '#404850', '#283038'],
+  };
+  // Hot glow colors per metal
+  const MOLTEN_HOT  = '#ffaa30';  // orange-amber correct for ~1000°C bronze
+  const MOLTEN_WARM = '#ff6c10';
+  const MOLTEN_DEEP = '#c52408';
+
+  /* ── Pre-render mold texture ──────────────────────────────────────────── */
+  function renderMold(
+    ctx: CanvasRenderingContext2D, W: number, H: number,
+    mpx: Uint8ClampedArray, moldType: string,
+    maskCv: HTMLCanvasElement,
+    branches: { x0: number; x1: number; y: number }[]
+  ) {
+    if (moldType === 'investment') {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0,   '#d8d0c0'); g.addColorStop(1, '#beb5a0');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(0,0,0,0.06)';
+      for (let i = 0; i < W * H * 0.006; i++) {
+        ctx.fillRect(Math.random()*W|0, Math.random()*H|0, 1, 1);
+      }
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, '#1c1408'); g.addColorStop(1, '#120e06');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      for (let i = 0; i < W * H * 0.018; i++) {
+        const b = 0.4 + Math.random() * 0.6;
+        ctx.fillStyle = `rgba(${60*b|0},${48*b|0},${30*b|0},0.5)`;
+        ctx.fillRect(Math.random()*W|0, Math.random()*H|0, 1, 1);
+      }
+    }
+    // Letter cavities — pixel-accurate via maskCv
+    {
+      const cav = mk(W, H);
+      const cc  = cav.getContext('2d')!;
+      cc.fillStyle = '#000'; cc.fillRect(0, 0, W, H);
+      cc.globalCompositeOperation = 'destination-in';
+      cc.drawImage(maskCv, 0, 0);
+      ctx.globalAlpha = moldType === 'investment' ? 0.10 : 0.25;
+      ctx.drawImage(cav, 0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
+    // Branch channels in mold
+    if (branches.length > 0) {
+      ctx.save();
+      ctx.strokeStyle = `rgba(0,0,0,${moldType === 'investment' ? 0.18 : 0.38})`;
+      ctx.lineWidth = 1.5; ctx.lineCap = 'butt';
+      for (const br of branches) {
+        ctx.beginPath(); ctx.moveTo(br.x0, br.y); ctx.lineTo(br.x1, br.y); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // Cavity top-edge highlight (catches overhead light)
+    ctx.fillStyle = `rgba(${moldType === 'investment' ? '180,165,130' : '90,68,38'},0.38)`;
+    for (let x = 0; x < W; x++) {
+      for (let y = 0; y < H; y++) {
+        if (mpx[(y*W+x)*4] > 60) { ctx.fillRect(x, y, 1, 1); break; }
+      }
+    }
+  }
+
+  /* ── Pre-render molten texture ────────────────────────────────────────── */
+  function renderMolten(ctx: CanvasRenderingContext2D, W: number, H: number) {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0,    MOLTEN_HOT);
+    g.addColorStop(0.25, MOLTEN_WARM);
+    g.addColorStop(0.8,  MOLTEN_DEEP);
+    g.addColorStop(1,    '#7a1a08');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // Central hotspot near top (sprue entry)
+    const cx = W * 0.22, cy = H * 0.08;
+    const hot = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.32);
+    hot.addColorStop(0, 'rgba(255,255,200,0.55)'); hot.addColorStop(1, 'rgba(255,160,0,0)');
+    ctx.fillStyle = hot; ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ── Pre-render cooled metal texture ─────────────────────────────────── */
+  function renderCoolMetal(
+    ctx: CanvasRenderingContext2D, W: number, H: number, metalType: string
+  ) {
+    const [c0, c1, c2, c3] = METAL_COLORS[metalType] ?? METAL_COLORS.bronze;
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, c0); g.addColorStop(0.4, c1); g.addColorStop(0.75, c2); g.addColorStop(1, c3);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // As-cast grain (sand-mold roughness)
+    for (let i = 0; i < W * H * 0.012; i++) {
+      ctx.fillStyle = `rgba(0,0,0,${0.07 + Math.random() * 0.13})`;
+      ctx.fillRect(Math.random()*W|0, Math.random()*H|0, 1, 1);
+    }
+    // Top-left specular
+    const spec = ctx.createLinearGradient(0, 0, W * 0.45, H * 0.35);
+    spec.addColorStop(0, 'rgba(255,255,255,0.18)'); spec.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = spec; ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ── Glyph mask from live DOM (Range API) ─────────────────────────────── */
+  function buildMask(wrap: HTMLElement, heading: HTMLElement, W: number, H: number) {
+    const off = mk(W, H);
+    const ctx = off.getContext('2d')!;
+    const pr  = wrap.getBoundingClientRect();
+    const range = document.createRange();
+    ctx.fillStyle = '#fff';
+    function walk(node: Node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const txt = (node.textContent || '').trim();
+        if (!txt) return;
+        const el  = (node.parentElement ?? heading) as HTMLElement;
+        const cs  = window.getComputedStyle(el);
+        ctx.font  = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        ctx.textBaseline = 'alphabetic';
+        const m = ctx.measureText(txt);
+        range.selectNode(node);
+        for (const r of Array.from(range.getClientRects())) {
+          if (r.width < 2) continue;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(r.left - pr.left, r.top - pr.top, r.width + 1, r.height + 1);
+          ctx.clip();
+          ctx.fillText(txt, r.left - pr.left, r.top - pr.top + m.fontBoundingBoxAscent);
+          ctx.restore();
+        }
+      } else { node.childNodes.forEach(walk); }
+    }
+    walk(heading);
+    return ctx.getImageData(0, 0, W, H).data;
+  }
+
+  /* ── Sand particle system ─────────────────────────────────────────────── */
+  type SandPt = { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; r: number; c: string };
+  const sand: SandPt[] = [];
+  const GRAV_SAND = 560;
+
+  function spawnSand(nonLetterCols: number[], H: number, dt: number, moldType: string) {
+    const rate = moldType === 'sand' ? 70 : 35;
+    const n    = Math.floor(rate * dt * (0.4 + Math.random() * 0.6));
+    for (let i = 0; i < n && sand.length < MAX_SAND; i++) {
+      const col = nonLetterCols[Math.floor(Math.random() * nonLetterCols.length)];
+      const b   = 0.5 + Math.random() * 0.5;
+      const c   = moldType === 'sand'
+        ? `rgba(${80*b|0},${62*b|0},${40*b|0},0.8)`
+        : `rgba(${200*b|0},${192*b|0},${168*b|0},0.7)`;
+      sand.push({
+        x: col + (Math.random() - 0.5) * 6,
+        y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 130,
+        vy: 50 + Math.random() * 220,
+        life: 0,
+        maxLife: 0.22 + Math.random() * 0.42,
+        r: 0.5 + Math.random() * 1.5,
+        c,
+      });
+    }
+  }
+
+  function updateSand(dt: number) {
+    for (let i = sand.length - 1; i >= 0; i--) {
+      const s = sand[i];
+      s.x += s.vx * dt; s.y += s.vy * dt; s.vy += GRAV_SAND * dt; s.life += dt;
+      if (s.life >= s.maxLife) sand.splice(i, 1);
+    }
+  }
+
+  function drawSand(ctx: CanvasRenderingContext2D) {
+    for (const s of sand) {
+      const f = 1 - s.life / s.maxLife;
+      ctx.globalAlpha = f * 0.82;
+      ctx.fillStyle   = s.c;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ── Main per-element setup ───────────────────────────────────────────── */
+  function setup(wrap: HTMLElement) {
+    if (nActive >= MAX_ACT) { setTimeout(() => setup(wrap), 300); return; }
+    nActive++;
+
+    const bedEl = wrap.querySelector<HTMLCanvasElement>('.cast-bed');
+    const fxEl  = wrap.querySelector<HTMLCanvasElement>('.cast-fx');
+    if (!bedEl || !fxEl) { nActive--; return; }
+
+    const heading = wrap.querySelector<HTMLElement>('h1,h2,h3,h4,h5,h6,[data-ct]');
+    if (!heading) { nActive--; return; }
+
+    const DUR      = parseFloat(wrap.dataset.ctDuration || '3.5') * 1000;
+    const DELAY    = parseFloat(wrap.dataset.ctDelay    || '0.25') * 1000;
+    const METAL    = wrap.dataset.ctMetal || 'bronze';
+    const MOLDTYPE = wrap.dataset.ctMold  || 'sand';
+
+    const rect = wrap.getBoundingClientRect();
+    const W    = Math.floor(rect.width);
+    const H    = Math.floor(rect.height);
+    if (W < 40 || H < 8) { nActive--; return; }
+
+    const DPR  = Math.min(window.devicePixelRatio || 1, 2);
+    const PW   = Math.round(W * DPR);
+    const PH   = Math.round(H * DPR);
+
+    function setCanvas(el: HTMLCanvasElement) {
+      el.width = PW; el.height = PH;
+      el.style.width = W + 'px'; el.style.height = H + 'px';
+      const c = el.getContext('2d')!; c.scale(DPR, DPR); return c;
+    }
+    const bCtx  = setCanvas(bedEl);
+    const fxCtx = setCanvas(fxEl);
+
+    const moldOff   = mk(PW, PH);
+    const moltenOff = mk(PW, PH);
+    const coolOff   = mk(PW, PH);
+    const accOff    = mk(PW, PH); // accumulates poured metal
+    const t1Off     = mk(PW, PH);
+    const t1Ctx     = t1Off.getContext('2d')!; t1Ctx.scale(DPR, DPR);
+
+    // Phase schedule (fractions of total duration)
+    const phases = [
+      { name: 'mold',     t0: 0.00, t1: 0.09 },
+      { name: 'pour',     t0: 0.09, t1: 0.49 },
+      { name: 'cool',     t0: 0.49, t1: 0.63 },
+      { name: 'shakeout', t0: 0.63, t1: 0.88 },
+      { name: 'trim',     t0: 0.88, t1: 1.00 },
+    ];
+    const DUR_S = DUR / 1000;
+
+    document.fonts.ready.then(() => {
+      const mpx = buildMask(wrap, heading, W, H);
+
+      // Per-column extents
+      const ytA = new Int16Array(W).fill(-1);
+      const ybA = new Int16Array(W).fill(-1);
+      for (let x = 0; x < W; x++) {
+        for (let y = 0; y < H; y++) {
+          if (mpx[(y*W+x)*4] > 60) { if (ytA[x] < 0) ytA[x] = y; ybA[x] = y; }
+        }
+      }
+
+      // Non-letter columns (for sand spawning)
+      const nonLetterCols: number[] = [];
+      for (let x = 0; x < W; x++) { if (ytA[x] < 0) nonLetterCols.push(x); }
+
+      // Sprue position (leftmost letter column) + rightmost for fill propagation
+      let spruePt = { x: -1, y: -1 };
+      let letterMaxX = 0;
+      for (let x = 0; x < W; x++) {
+        if (ytA[x] >= 0) {
+          if (spruePt.x < 0) spruePt = { x, y: ytA[x] };
+          letterMaxX = x;
+        }
+      }
+      const actualSprue = Math.min(SPRUE_LEN, spruePt.y > 0 ? spruePt.y - 1 : 0);
+
+      // Fill levels: current fill top per column (starts below bottom)
+      const fillY = new Float32Array(W);
+      for (let x = 0; x < W; x++) fillY[x] = ybA[x] < 0 ? -1 : ybA[x] + 1;
+
+      // Pixel-accurate letter mask (W×H, used for composite ops)
+      const maskCv = mk(W, H);
+      {
+        const c = maskCv.getContext('2d')!;
+        const id = c.createImageData(W, H);
+        for (let i = 0; i < mpx.length; i++) id.data[i] = mpx[i];
+        c.putImageData(id, 0, 0);
+      }
+
+      // Identify letter groups: contiguous letter-column spans; only merge 1-2px gaps
+      // (rendering sub-pixel gaps inside a stroke), not actual inter-letter spaces.
+      const letterGroups: { x0: number; x1: number; yTop: number }[] = [];
+      {
+        let gx0 = -1, gx1 = -1, gTop = H;
+        for (let x = 0; x <= W; x++) {
+          const has = x < W && ytA[x] >= 0;
+          if (has) {
+            if (gx0 < 0) { gx0 = x; gTop = ytA[x]; }
+            else if (ytA[x] < gTop) gTop = ytA[x];
+            gx1 = x;
+          } else if (gx0 >= 0) {
+            const prev = letterGroups[letterGroups.length - 1];
+            if (prev && gx0 - prev.x1 <= 2) {
+              prev.x1 = gx1;
+              if (gTop < prev.yTop) prev.yTop = gTop;
+            } else {
+              letterGroups.push({ x0: gx0, x1: gx1, yTop: gTop });
+            }
+            gx0 = -1; gTop = H;
+          }
+        }
+      }
+
+      // Inter-letter branches: 1-px-tall connectors between adjacent letter groups.
+      // Placed 2px below the highest letter top in each pair — consistent visual band.
+      const branches: { x0: number; x1: number; y: number }[] = [];
+      for (let i = 0; i + 1 < letterGroups.length; i++) {
+        const gL = letterGroups[i], gR = letterGroups[i + 1];
+        const gap = gR.x0 - gL.x1;
+        if (gap >= 2 && gap <= 24) {
+          const y = Math.min(gL.yTop, gR.yTop) + 2;
+          branches.push({ x0: gL.x1, x1: gR.x0, y });
+        }
+      }
+
+      // Snap mask: letter pixels + branch pixels (for pixel-accurate accOff after pour)
+      const snapCv = mk(W, H);
+      {
+        const c = snapCv.getContext('2d')!;
+        c.drawImage(maskCv, 0, 0);
+        c.fillStyle = '#fff';
+        for (const br of branches) c.fillRect(br.x0, br.y, br.x1 - br.x0, 1);
+      }
+
+      // Pre-render off-screen canvases
+      { const c = moldOff.getContext('2d')!; c.scale(DPR, DPR); renderMold(c, W, H, mpx, MOLDTYPE, maskCv, branches); }
+      { const c = moltenOff.getContext('2d')!; c.scale(DPR, DPR); renderMolten(c, W, H); }
+      { const c = coolOff.getContext('2d')!; c.scale(DPR, DPR); renderCoolMetal(c, W, H, METAL); }
+
+      const acCtx = accOff.getContext('2d')!; acCtx.scale(DPR, DPR);
+
+      let phaseIdx       = 0;
+      let lastTs: number | null = null;
+      let startTs        = 0;
+      let pourSnapped    = false;
+      let branchesFilled = false;
+
+      function finalise() {
+        fxEl.style.display = 'none';
+        bedEl.style.transition = 'opacity 0.28s ease';
+        bedEl.style.opacity    = '0';
+        heading.style.visibility = 'visible';
+        setTimeout(() => { bedEl.style.display = 'none'; nActive--; }, 320);
+      }
+
+      function showDone() {
+        bedEl.style.display = 'none'; fxEl.style.display = 'none';
+        heading.style.visibility = 'visible'; nActive--;
+      }
+
+      if (REDUCED) { showDone(); return; }
+      heading.style.visibility = 'hidden';
+
+      function frame(ts: number) {
+        if (!lastTs) lastTs = ts;
+        const dt      = Math.min((ts - lastTs) / 1000, 0.05);
+        lastTs        = ts;
+        const elapsed = Math.min((ts - startTs) / 1000, DUR_S);
+        const pct     = elapsed / DUR_S;
+
+        // Snap accOff to pixel-accurate mask (letters + branches) once pour ends
+        if (!pourSnapped && pct >= phases[1].t1) {
+          pourSnapped = true;
+          acCtx.clearRect(0, 0, W, H);
+          acCtx.drawImage(snapCv, 0, 0, W, H);
+        }
+
+        while (phaseIdx < phases.length - 1 && pct >= phases[phaseIdx].t1) phaseIdx++;
+        const ph = phases[phaseIdx];
+        const pt = ph.t1 > ph.t0 ? clamp((pct - ph.t0) / (ph.t1 - ph.t0), 0, 1) : 1;
+
+        // ── Pour phase: fill bottom-up, left-to-right from sprue ────────── //
+        if (ph.name === 'pour') {
+          const xOrig  = spruePt.x >= 0 ? spruePt.x : 0;
+          const xSpan  = Math.max(1, letterMaxX - xOrig);
+          acCtx.fillStyle = '#fff';
+          for (let x = 0; x < W; x++) {
+            const yt = ytA[x], yb = ybA[x];
+            if (yt < 0) continue;
+            // Stagger each column's fill start: rightmost columns start 32% later
+            const xDelay  = (x - xOrig) / xSpan * 0.32;
+            const colPt   = clamp((pt - xDelay) / Math.max(0.01, 1 - xDelay), 0, 1);
+            const colProg = eio(colPt);
+            const wave = Math.sin(x * 0.35 + elapsed * 4.5) * 4;
+            const target = Math.max(yt, yb - colProg * (yb - yt) + wave);
+            if (target < fillY[x]) {
+              const h = Math.max(1, fillY[x] - target);
+              acCtx.fillRect(x, target | 0, 1, (h + 0.5) | 0);
+              fillY[x] = target;
+            }
+          }
+          // Fill branch channels when most columns are ~80% filled
+          if (!branchesFilled && pt >= 0.82) {
+            branchesFilled = true;
+            acCtx.fillStyle = '#fff';
+            for (const br of branches) acCtx.fillRect(br.x0, br.y, br.x1 - br.x0, 1);
+          }
+        }
+
+        // ── Shakeout: spawn sand particles ─────────────────────────────── //
+        if (ph.name === 'shakeout' && nonLetterCols.length > 0) {
+          spawnSand(nonLetterCols, H, dt, MOLDTYPE);
+        }
+        updateSand(dt);
+
+        // ── Composite ──────────────────────────────────────────────────── //
+        const moldAlpha = ph.name === 'shakeout' ? 1 - eio(pt)
+                        : ph.name === 'trim'     ? 0
+                        : 1;
+        const coolT   = ph.name === 'cool'     ? eio(pt)
+                      : ph.name === 'shakeout' ? 1
+                      : ph.name === 'trim'     ? 1
+                      : 0;
+        const moltenA = ph.name === 'pour'     ? 1
+                      : ph.name === 'cool'     ? Math.max(0, 1 - eio(pt))
+                      : 0;
+        const sprueCoolA = ph.name === 'cool'     ? eio(pt)
+                         : ph.name === 'shakeout' ? 1
+                         : ph.name === 'trim'     ? 1
+                         : 0;
+        const sprueLen   = ph.name === 'trim' ? actualSprue * (1 - eio(pt)) : actualSprue;
+
+        bCtx.clearRect(0, 0, W, H);
+        fxCtx.clearRect(0, 0, W, H);
+
+        // Layer 1: mold (fades during shakeout, gone during trim)
+        if (moldAlpha > 0) {
+          bCtx.globalAlpha = moldAlpha * (ph.name === 'mold' ? pt : 1);
+          bCtx.drawImage(moldOff, 0, 0, W, H);
+          bCtx.globalAlpha = 1;
+        }
+
+        // Layer 2: molten metal masked to accOff
+        if (moltenA > 0) {
+          t1Ctx.clearRect(0, 0, W, H);
+          t1Ctx.drawImage(moltenOff, 0, 0, W, H);
+          t1Ctx.globalCompositeOperation = 'destination-in';
+          t1Ctx.drawImage(accOff, 0, 0, W, H);
+          t1Ctx.globalCompositeOperation = 'source-over';
+          bCtx.globalAlpha = moltenA;
+          bCtx.drawImage(t1Off, 0, 0, W, H);
+          bCtx.globalAlpha = 1;
+        }
+
+        // Layer 3: cool metal masked to accOff
+        if (coolT > 0) {
+          t1Ctx.clearRect(0, 0, W, H);
+          t1Ctx.drawImage(coolOff, 0, 0, W, H);
+          t1Ctx.globalCompositeOperation = 'destination-in';
+          t1Ctx.drawImage(accOff, 0, 0, W, H);
+          t1Ctx.globalCompositeOperation = 'source-over';
+          bCtx.globalAlpha = coolT;
+          bCtx.drawImage(t1Off, 0, 0, W, H);
+          bCtx.globalAlpha = 1;
+          // Residual surface heat — warm glow fades inward as skin forms at edges
+          if (ph.name === 'cool' && coolT < 0.85) {
+            const heat = (1 - coolT / 0.85) * 0.50;
+            t1Ctx.clearRect(0, 0, W, H);
+            const hg = t1Ctx.createLinearGradient(0, 0, 0, H);
+            hg.addColorStop(0, `rgba(255,95,28,${heat.toFixed(2)})`);
+            hg.addColorStop(1, `rgba(160,38,10,${(heat * 0.5).toFixed(2)})`);
+            t1Ctx.fillStyle = hg; t1Ctx.fillRect(0, 0, W, H);
+            t1Ctx.globalCompositeOperation = 'destination-in';
+            t1Ctx.drawImage(accOff, 0, 0, W, H);
+            t1Ctx.globalCompositeOperation = 'source-over';
+            bCtx.drawImage(t1Off, 0, 0, W, H);
+          }
+        }
+
+        // Molten surface shimmer (during pour)
+        if (ph.name === 'pour' && moltenA > 0.2) {
+          const shimN = 14;
+          for (let i = 0; i < shimN; i++) {
+            const sx = Math.random() * W;
+            const xi  = clamp(Math.round(sx), 0, W - 1);
+            if (ytA[xi] < 0) continue;
+            const sy = fillY[xi] + (Math.random() - 0.5) * 3;
+            if (sy > ybA[xi] + 1 || sy < ytA[xi] - 2) continue;
+            bCtx.fillStyle = `rgba(255,255,200,${Math.random() * 0.35})`;
+            bCtx.beginPath(); bCtx.arc(sx, sy, 0.7 + Math.random() * 1.3, 0, Math.PI * 2); bCtx.fill();
+          }
+        }
+
+        // Sprue stub (solidified metal above first letter)
+        if (spruePt.x >= 0 && actualSprue > 0 && sprueCoolA > 0 && sprueLen > 0) {
+          const [c0] = METAL_COLORS[METAL] ?? METAL_COLORS.bronze;
+          bCtx.strokeStyle = c0;
+          bCtx.lineWidth   = 4;
+          bCtx.lineCap     = 'round';
+          bCtx.globalAlpha = sprueCoolA;
+          bCtx.beginPath();
+          bCtx.moveTo(spruePt.x, spruePt.y - sprueLen);
+          bCtx.lineTo(spruePt.x, spruePt.y);
+          bCtx.stroke();
+          // Flash at trim cut (cut line at base, then grind sparks)
+          if (ph.name === 'trim' && pt < 0.45) {
+            const fa = (1 - pt / 0.45) * 0.92;
+            bCtx.strokeStyle = `rgba(255,220,60,${fa.toFixed(2)})`;
+            bCtx.lineWidth   = 6;
+            bCtx.lineCap     = 'round';
+            bCtx.beginPath();
+            bCtx.moveTo(spruePt.x - 6, spruePt.y);
+            bCtx.lineTo(spruePt.x + 6, spruePt.y);
+            bCtx.stroke();
+          }
+          bCtx.globalAlpha = 1;
+        }
+
+        // FX: sand particles
+        if (sand.length > 0) drawSand(fxCtx);
+
+        if (pct >= 1) { finalise(); return; }
+        requestAnimationFrame(frame);
+      }
+
+      setTimeout(() => { startTs = performance.now(); requestAnimationFrame(frame); }, DELAY);
+    });
+  }
+
+  /* ── Observer / init ─────────────────────────────────────────────────── */
+  function init() {
+    document.querySelectorAll<HTMLElement>('.cast-wrap').forEach(wrap => {
+      if (REDUCED) {
+        const h = wrap.querySelector<HTMLElement>('h1,h2,h3,h4,h5,h6');
+        if (h) h.style.visibility = 'visible';
+        return;
+      }
+      const trig = wrap.dataset.ctTrigger || 'scroll';
+      if (trig === 'scroll' && 'IntersectionObserver' in window) {
+        const obs = new IntersectionObserver(entries => {
+          entries.forEach(e => {
+            if (e.isIntersecting) { obs.unobserve(e.target as HTMLElement); setup(e.target as HTMLElement); }
+          });
+        }, { threshold: 0.12, rootMargin: '0px 0px -20px 0px' });
+        obs.observe(wrap);
+      } else {
+        setup(wrap);
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>

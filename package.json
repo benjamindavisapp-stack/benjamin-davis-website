@@ -1,0 +1,16 @@
+{
+  "name": "benjamin-davis-website",
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^4.16.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}

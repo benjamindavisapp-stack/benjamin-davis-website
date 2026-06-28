@@ -1,0 +1,575 @@
+---
+import Layout     from '@/layouts/Layout.astro';
+import Lattice    from '@/components/Lattice.astro';
+import Bolt       from '@/components/Bolt.astro';
+import SLSText    from '@/components/SLSText.astro';
+---
+
+<Layout
+  title="About — Benjamin Davis"
+  description="Benjamin Davis is a junior at Bishop Feehan High School in Wrentham, MA — advanced manufacturing researcher, ISEF 2025 Young Scientist, TechForge co-founder, and robotics captain."
+>
+
+  <!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+  <section class="hero">
+    <Lattice />
+    <Bolt position="tl" />
+    <Bolt position="tr" />
+    <Bolt position="bl" />
+    <Bolt position="br" />
+    <div class="container hero-body">
+      <p class="hero-eyebrow">About</p>
+      <SLSText id="about-hero" duration={3} layers={2} delay={0.4}>
+        <h1 class="hero-heading">
+          I build real things —<br/>
+          <span class="gold">in metal, in code,</span><br/>
+          in whatever the problem requires.
+        </h1>
+      </SLSText>
+      <p class="hero-sub">
+        Bishop Feehan High School &middot; Wrentham, MA &middot; Class of 2027
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Intro: bio + portrait ─────────────────────────────────────────────── -->
+  <section class="intro">
+    <div class="container intro-inner">
+
+      <div class="bio">
+        <p class="bio-para">
+          I'm a junior at Bishop Feehan focused on advanced and additive manufacturing —
+          designing systems that process, recycle, and produce materials at a scale that
+          doesn't require a factory. My flagship project is a desktop plastic recycling
+          machine I built in my garage workshop over 800 hours: it takes PET bottle waste
+          and 3D-printing scrap and turns it into usable filament, within commercial
+          tolerances, at roughly one-tenth the cost of buying it.
+        </p>
+
+        <p class="bio-para">
+          I designed it largely without formal instruction, revised 50+ components before
+          it worked, and documented everything. That work earned the Regeneron Young
+          Scientist Award at ISEF 2025 — one of two students worldwide — a $75,000
+          scholarship, and a place in the Masason Foundation. What those credentials
+          don't show is the 2&thinsp;a.m. teardowns, the CAD files I scrapped and
+          restarted, or the months where the machine worked on paper and not in metal.
+          The iteration is part of the record.
+        </p>
+
+        <p class="bio-para">
+          I co-founded TechForge, Bishop Feehan's hands-on fabrication club, and captain
+          the robotics team. I've taught 20+ students CAD, 3D printing, and CNC machining.
+          I mentor science fair students for free — online and in person — and I sit on
+          the Massachusetts Science &amp; Engineering Fair Advisory Board. The longer aim
+          is the same across all of it: more people doing real engineering work, with real
+          tools, earlier.
+        </p>
+      </div>
+
+      <div class="portrait-wrap">
+        <div class="portrait-frame">
+          <img
+            src="/images/headshot-alt.jpg"
+            alt="Benjamin Davis — Bishop Feehan High School, Wrentham, MA"
+            width="480"
+            height="600"
+            loading="eager"
+            decoding="async"
+          />
+          <Bolt position="tl" size={14} />
+          <Bolt position="tr" size={14} />
+          <Bolt position="bl" size={14} />
+          <Bolt position="br" size={14} />
+        </div>
+        <p class="portrait-caption">Bishop Feehan High School &middot; 2026</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Capabilities spec-sheet ───────────────────────────────────────────── -->
+  <section class="capabilities">
+    <div class="container">
+      <p class="section-overline">Capabilities</p>
+      <SLSText id="cap-heading" duration={2.2} layers={1}>
+        <h2 class="section-heading">What I work with</h2>
+      </SLSText>
+
+      <div class="spec-table" role="table" aria-label="Engineering capabilities">
+
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">CAD &amp; Modeling</span>
+          <span class="spec-val" role="cell">
+            Fusion 360 &middot; OnShape &middot; Fritzing &middot; Part drawing &middot; Assembly modeling &middot; PCB layout
+          </span>
+        </div>
+
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Fabrication</span>
+          <span class="spec-val" role="cell">
+            3D printing (FDM) &middot; CNC machining &middot; Hand tools &middot; Iterative prototyping &middot; Precision measurement &middot; Workshop setup &amp; safety
+          </span>
+        </div>
+
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Electronics</span>
+          <span class="spec-val" role="cell">
+            Soldering &middot; Electronics design &middot; Arduino &middot; Sensor integration &middot; Motor control &middot; Wiring &amp; harness assembly
+          </span>
+        </div>
+
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Engineering</span>
+          <span class="spec-val" role="cell">
+            Mechanical &middot; Electrical &middot; Systems &middot; Materials science &middot; Additive manufacturing &middot; Product design &amp; iteration
+          </span>
+        </div>
+
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Research</span>
+          <span class="spec-val" role="cell">
+            Independent experimental research &middot; Data collection &amp; statistical analysis &middot; Scientific writing &middot; Lab documentation &middot; Peer review process
+          </span>
+        </div>
+
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Teaching</span>
+          <span class="spec-val" role="cell">
+            Curriculum design &middot; CAD &amp; fabrication instruction &middot; Science fair mentoring &middot; Public speaking &middot; Peer leadership
+          </span>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Beyond the lab ────────────────────────────────────────────────────── -->
+  <section class="beyond">
+    <div class="container beyond-inner">
+
+      <div class="beyond-text">
+        <p class="section-overline">Beyond the Lab</p>
+        <SLSText id="beyond-heading" duration={2.0} layers={1}>
+          <h2 class="section-heading">The rest of it</h2>
+        </SLSText>
+        <p class="beyond-para">
+          I've played clarinet in Bishop Feehan's concert band for all four years of high
+          school — 1st chair, Honors Band, and NCBA recognition in 2026. The jazz ensemble
+          pulls me onto drum set as well. Clarinet requires the same daily precision that
+          engineering does: you improve by showing up and doing it correctly, over time,
+          until it stops being effort and becomes instinct.
+        </p>
+        <p class="beyond-para">
+          I'm on the debate and math teams at the varsity level. When I'm not in the shop
+          or at a music stand, I'm usually biking, rock-climbing, or baking — I've been
+          known to bring éclairs to French class and Bredele cookies for anyone nearby.
+          None of that has obvious engineering applications. All of it keeps me sharper.
+        </p>
+      </div>
+
+      <div class="beyond-tags">
+        <div class="tag-group">
+          <p class="tag-label">Music</p>
+          <ul class="tag-list" role="list">
+            <li>Clarinet &mdash; 1st Chair</li>
+            <li>Drum Set &mdash; Jazz Ensemble</li>
+            <li>NCBA Honors Band 2026</li>
+            <li>SEMMEA Districts 2024</li>
+          </ul>
+        </div>
+        <div class="tag-group">
+          <p class="tag-label">Academic Teams</p>
+          <ul class="tag-list" role="list">
+            <li>Debate &mdash; Varsity</li>
+            <li>Math Team &mdash; Varsity</li>
+          </ul>
+        </div>
+        <div class="tag-group">
+          <p class="tag-label">Outside</p>
+          <ul class="tag-list" role="list">
+            <li>Biking</li>
+            <li>Rock climbing</li>
+            <li>Baking</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Honor Societies strip ─────────────────────────────────────────────── -->
+  <section class="honors">
+    <div class="container">
+      <p class="honors-label" aria-label="Honor societies">Honor Societies</p>
+      <ul class="honors-list" role="list">
+        <li>Science NHS &mdash; VP</li>
+        <li>National Honor Society</li>
+        <li>National Math Honor Society</li>
+        <li>National English Honor Society</li>
+        <li>National Social Studies Honor Society</li>
+        <li>Tri-M Music Honor Society</li>
+        <li>Soci&eacute;t&eacute; Honoraire de Fran&ccedil;ais</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ── CTA ───────────────────────────────────────────────────────────────── -->
+  <section class="cta-band">
+    <div class="container cta-inner">
+      <p class="cta-text">Collaboration, mentorship, or media — reach out.</p>
+      <a href="/contact" class="btn btn-primary">Get in Touch</a>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  /* ── Button ──────────────────────────────────────────────────────────────── */
+  .btn {
+    display: inline-block;
+    padding: 0.7rem 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .btn-primary {
+    background: var(--gold);
+    color: var(--graphite);
+    border: 1px solid var(--gold);
+  }
+  .btn-primary:hover {
+    background: var(--gold-bright);
+    border-color: var(--gold-bright);
+    color: var(--graphite);
+  }
+
+  /* ── Hero ────────────────────────────────────────────────────────────────── */
+  .hero {
+    position: relative;
+    padding-block: 5rem 4rem;
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .hero-body {
+    position: relative;
+    z-index: 1;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+
+  .hero-heading {
+    font-family: var(--font-head);
+    font-size: clamp(2rem, 7vw, 3.5rem);
+    font-weight: 900;
+    line-height: 1.05;
+    color: var(--text);
+  }
+
+  .hero-sub {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--steel);
+    margin-top: 0.25rem;
+  }
+
+  /* ── Intro ───────────────────────────────────────────────────────────────── */
+  .intro {
+    padding-block: 4.5rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .intro-inner {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 3.5rem;
+    align-items: start;
+  }
+
+  .bio {
+    display: flex;
+    flex-direction: column;
+    gap: 1.35rem;
+  }
+
+  .bio-para {
+    font-size: 1rem;
+    line-height: 1.78;
+    color: var(--text);
+  }
+
+  /* Portrait */
+  .portrait-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .portrait-frame {
+    position: relative;
+    border: 1px solid var(--panel-edge);
+    overflow: hidden;
+    background: var(--panel);
+  }
+
+  .portrait-frame img {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+    filter: contrast(1.04) brightness(0.95);
+  }
+
+  .portrait-caption {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--steel);
+    text-align: right;
+  }
+
+  @media (max-width: 720px) {
+    .intro-inner {
+      grid-template-columns: 1fr;
+    }
+    .portrait-wrap {
+      order: -1;
+      max-width: 320px;
+    }
+  }
+
+  /* ── Capabilities ────────────────────────────────────────────────────────── */
+  .capabilities {
+    padding-block: 4.5rem;
+    border-bottom: 1px solid var(--panel-edge);
+    background: var(--panel);
+  }
+
+  /* Shared section labels */
+  .section-overline {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+    margin-bottom: 0.4rem;
+  }
+
+  .section-heading {
+    font-family: var(--font-head);
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
+    font-weight: 900;
+    color: var(--text);
+    margin-bottom: 2rem;
+  }
+
+  /* Spec table — shared pattern */
+  .spec-table {
+    border: 1px solid var(--panel-edge);
+  }
+
+  .spec-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .spec-row:last-child { border-bottom: none; }
+
+  .spec-key {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--copper);
+    padding: 0.9rem 0.85rem;
+    border-right: 1px solid var(--panel-edge);
+    display: flex;
+    align-items: flex-start;
+    padding-top: 0.95rem;
+    background: color-mix(in srgb, var(--graphite) 60%, var(--panel));
+  }
+
+  .spec-val {
+    font-size: 0.82rem;
+    color: var(--text);
+    line-height: 1.55;
+    padding: 0.85rem 1rem;
+    display: flex;
+    align-items: center;
+  }
+
+  @media (max-width: 500px) {
+    .spec-row {
+      grid-template-columns: 1fr;
+    }
+    .spec-key {
+      border-right: none;
+      border-bottom: 1px solid var(--panel-edge);
+      padding-bottom: 0.45rem;
+    }
+  }
+
+  /* ── Beyond the lab ──────────────────────────────────────────────────────── */
+  .beyond {
+    padding-block: 4.5rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .beyond-inner {
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    gap: 3.5rem;
+    align-items: start;
+  }
+
+  .beyond-text .section-heading {
+    margin-bottom: 1.5rem;
+  }
+
+  .beyond-para {
+    font-size: 0.95rem;
+    line-height: 1.78;
+    color: var(--text);
+    margin-bottom: 1.1rem;
+  }
+  .beyond-para:last-child { margin-bottom: 0; }
+
+  /* Tag groups */
+  .beyond-tags {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-top: 4.5rem; /* align with text after heading */
+  }
+
+  .tag-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .tag-label {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--copper);
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--panel-edge);
+    margin-bottom: 0.1rem;
+  }
+
+  .tag-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .tag-list li {
+    font-size: 0.78rem;
+    color: var(--steel);
+    line-height: 1.4;
+  }
+
+  @media (max-width: 640px) {
+    .beyond-inner {
+      grid-template-columns: 1fr;
+    }
+    .beyond-tags {
+      padding-top: 0;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+  }
+
+  /* ── Honor societies strip ───────────────────────────────────────────────── */
+  .honors {
+    padding-block: 1.5rem;
+    border-bottom: 1px solid var(--panel-edge);
+    background: var(--panel);
+  }
+
+  .honors .container {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+  }
+
+  .honors-label {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--copper);
+    flex-shrink: 0;
+  }
+
+  .honors-list {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1rem;
+  }
+
+  .honors-list li {
+    font-size: 0.72rem;
+    color: var(--steel);
+    letter-spacing: 0.02em;
+  }
+
+  .honors-list li::before {
+    content: '·  ';
+    color: var(--panel-edge);
+  }
+
+  /* ── CTA band ─────────────────────────────────────────────────────────────── */
+  .cta-band {
+    padding-block: 3.5rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .cta-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+  }
+
+  .cta-text {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  @media (max-width: 480px) {
+    .cta-inner {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>

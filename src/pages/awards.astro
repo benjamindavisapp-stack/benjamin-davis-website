@@ -1,0 +1,413 @@
+---
+import Layout     from '@/layouts/Layout.astro';
+import Lattice    from '@/components/Lattice.astro';
+import Bolt       from '@/components/Bolt.astro';
+import LaserCutText from '@/components/LaserCutText.astro';
+
+const headline = [
+  {
+    title:  'Masason Foundation Member',
+    org:    'Masason Foundation',
+    year:   '2025',
+    note:   'Highly selective global fellowship founded by SoftBank\'s Masayoshi Son, supporting exceptional young innovators worldwide. Sought out by the Secretariat.',
+    tag:    'Fellowship',
+  },
+  {
+    title:  'Regeneron Young Scientist Award',
+    org:    'Regeneron ISEF 2025 · Columbus, OH',
+    year:   '2025',
+    note:   'One of two students worldwide to receive this distinction. 2nd-highest overall score at ISEF 2025. $75,000 scholarship.',
+    tag:    'Science Fair',
+  },
+];
+
+const awards = [
+  // ── 2026 ──────────────────────────────────────────────────────────────────
+  {
+    year: '2026',
+    entries: [
+      { title: 'AJAS Fellow',                               org: 'American Junior Academy of Science',                  context: 'Presented research at the AAAS Annual Conference' },
+      { title: 'Sigma Xi Member',                           org: 'Sigma Xi, The Scientific Research Honor Society',     context: 'Nominated after meeting CEO & Executive Director Jamie L. Vernon at the AAAS/AJAS Conference' },
+      { title: 'Bausch + Lomb Honorary Science Award',      org: 'Bishop Feehan High School',                          context: 'Outstanding junior in science' },
+      { title: 'Yale Book Award',                           org: 'Yale University / Bishop Feehan High School',         context: 'Outstanding junior in academics and character' },
+      { title: 'Science Gold Medal',                        org: 'Bishop Feehan High School',                          context: 'Highest grade in Science among entire grade' },
+      { title: 'Fine Arts Gold Medal',                      org: 'Bishop Feehan High School',                          context: 'Highest grade in Fine Arts among entire grade' },
+      { title: 'NCBA Honors Band',                          org: 'National Catholic Bandmasters Association',           context: 'Selected for national honors band — 1st Clarinet' },
+      { title: 'Outstanding Catholic Concert Band in the United States', org: 'National Catholic Bandmasters Association', context: 'Bishop Feehan Concert Band' },
+    ],
+  },
+  // ── 2025 ──────────────────────────────────────────────────────────────────
+  {
+    year: '2025',
+    entries: [
+      { title: '1st Place — Engineering Technology: Statics & Dynamics', org: 'Regeneron ISEF 2025 · Columbus, OH',    context: 'Category first place' },
+      { title: '1st Place — Massachusetts State Science & Engineering Fair', org: 'MSEF 2025',                         context: '"From Crude to Extrude"' },
+      { title: 'AMD Engineering Excellence Award',          org: 'Massachusetts State Science & Engineering Fair',     context: '' },
+      { title: 'AMD Engineering Excellence Award',          org: 'Massachusetts Region III Science Fair',              context: '' },
+      { title: '1st Place — Bishop Feehan Science Fair',   org: 'Bishop Feehan High School',                          context: '"From Crude to Extrude"' },
+      { title: 'Excellence in Visual Presentation',         org: 'Bishop Feehan High School Science Fair',             context: '' },
+    ],
+  },
+  // ── 2024 ──────────────────────────────────────────────────────────────────
+  {
+    year: '2024',
+    entries: [
+      { title: '1st Place — Massachusetts Region III Science Fair', org: 'MSEF Region III 2024',                       context: 'Prior project' },
+      { title: 'Sanofi Special Care Grand Prize',           org: 'Massachusetts Region III Science Fair',              context: '' },
+      { title: 'U.S. Air Force Certificate of Achievement', org: 'Massachusetts Region III Science Fair',              context: 'Outstanding Science & Engineering Fair Project' },
+      { title: '1st Place, Excellence in Visual Presentation', org: 'Bishop Feehan High School Science Fair',         context: '' },
+      { title: 'Fine Arts Gold Medal',                      org: 'Bishop Feehan High School',                          context: 'Highest grade in Fine Arts among entire grade' },
+      { title: 'SEMMEA Districts — 2nd Clarinet, 1st Chair', org: 'SEMMEA',                                           context: 'Recommended for MMEA AllState Band' },
+    ],
+  },
+];
+---
+
+<Layout
+  title="Awards & Recognition — Benjamin Davis"
+  description="Full record of Benjamin Davis's awards, fellowships, science fair distinctions, and music honors — 2023 through 2026."
+>
+
+  <!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+  <section class="aw-hero">
+    <Lattice />
+    <Bolt position="tl" />
+    <Bolt position="tr" />
+    <Bolt position="bl" />
+    <Bolt position="br" />
+    <div class="container aw-hero-body">
+      <p class="overline">Recognition</p>
+      <LaserCutText id="awards-hero" duration={3.0} delay={0.35} material="steel">
+        <h1 class="aw-heading">Awards &amp;<br />Recognition</h1>
+      </LaserCutText>
+      <p class="aw-sub">A complete record of distinctions in research, science fair, academics, and music.</p>
+    </div>
+  </section>
+
+  <!-- ── Headline entries ───────────────────────────────────────────────────── -->
+  <section class="aw-headlines">
+    <div class="container">
+      <div class="headline-grid">
+        {headline.map(h => (
+          <article class="headline-card">
+            <div class="headline-top">
+              <span class="headline-tag">{h.tag}</span>
+              <span class="headline-year">{h.year}</span>
+            </div>
+            <h2 class="headline-title">{h.title}</h2>
+            <p class="headline-org">{h.org}</p>
+            <p class="headline-note">{h.note}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Timeline ──────────────────────────────────────────────────────────── -->
+  <section class="aw-timeline">
+    <div class="container">
+      {awards.map(group => (
+        <div class="year-group">
+          <div class="year-header">
+            <span class="year-label">{group.year}</span>
+            <span class="year-rule" aria-hidden="true" />
+          </div>
+          <ul class="entry-list" role="list">
+            {group.entries.map(e => (
+              <li class="entry">
+                <div class="entry-inner">
+                  <div class="entry-main">
+                    <p class="entry-title">{e.title}</p>
+                    <p class="entry-org">{e.org}{e.context ? <span class="entry-context"> — {e.context}</span> : ''}</p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- ── Band distinctions callout ─────────────────────────────────────────── -->
+  <section class="aw-band-strip">
+    <div class="container">
+      <p class="overline">Concert Band</p>
+      <div class="band-grid">
+        {[
+          { val: '3×', label: 'RIMEA Superior Rating — consecutive years' },
+          { val: '2×', label: 'Platinum — Great East Music Festival' },
+          { val: '1st', label: 'Gold — MICCA (first-ever performance)' },
+          { val: '#1', label: 'Outstanding Catholic Concert Band in the United States — 2026' },
+        ].map(b => (
+          <div class="band-cell">
+            <span class="band-val">{b.val}</span>
+            <span class="band-label">{b.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  /* ── Hero ──────────────────────────────────────────────────────────────── */
+  .aw-hero {
+    position: relative;
+    padding-block: 4rem 3rem;
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .aw-hero-body {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+
+  .overline {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+
+  .aw-heading {
+    font-family: var(--font-head);
+    font-size: clamp(2.6rem, 9vw, 5rem);
+    font-weight: 900;
+    line-height: 0.93;
+    color: var(--text);
+  }
+
+  .aw-sub {
+    font-size: 0.88rem;
+    color: var(--steel);
+    max-width: 480px;
+    line-height: 1.6;
+    margin-top: 0.4rem;
+  }
+
+  /* ── Headline cards ──────────────────────────────────────────────────────── */
+  .aw-headlines {
+    padding-block: 3rem;
+    border-bottom: 1px solid var(--panel-edge);
+    background: var(--panel);
+  }
+
+  .headline-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--panel-edge);
+    border: 1px solid var(--panel-edge);
+  }
+
+  .headline-card {
+    background: var(--graphite);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    position: relative;
+  }
+
+  .headline-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--copper), var(--gold));
+  }
+
+  .headline-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .headline-tag {
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--copper);
+    border: 1px solid var(--copper);
+    padding: 0.18rem 0.5rem;
+  }
+
+  .headline-year {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    color: var(--steel);
+  }
+
+  .headline-title {
+    font-family: var(--font-head);
+    font-size: clamp(1.15rem, 3.5vw, 1.55rem);
+    font-weight: 900;
+    line-height: 1.05;
+    color: var(--gold);
+  }
+
+  .headline-org {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.07em;
+    color: var(--steel);
+  }
+
+  .headline-note {
+    font-size: 0.8rem;
+    line-height: 1.65;
+    color: var(--text);
+    margin-top: auto;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--panel-edge);
+  }
+
+  /* ── Timeline ────────────────────────────────────────────────────────────── */
+  .aw-timeline {
+    padding-block: 3.5rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .year-group {
+    margin-bottom: 3rem;
+  }
+  .year-group:last-child { margin-bottom: 0; }
+
+  .year-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .year-label {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    color: var(--copper);
+    white-space: nowrap;
+  }
+
+  .year-rule {
+    flex: 1;
+    height: 1px;
+    background: var(--panel-edge);
+    display: block;
+  }
+
+  .entry-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .entry {
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .entry:first-child { border-top: 1px solid var(--panel-edge); }
+
+  .entry-inner {
+    padding: 0.75rem 0;
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+  }
+
+  .entry-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .entry-title {
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+  }
+
+  .entry-org {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.06em;
+    color: var(--steel);
+  }
+
+  .entry-context {
+    color: var(--steel);
+    opacity: 0.7;
+  }
+
+  /* ── Band strip ──────────────────────────────────────────────────────────── */
+  .aw-band-strip {
+    padding-block: 3rem;
+    background: var(--panel);
+  }
+
+  .band-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    background: var(--panel-edge);
+    border: 1px solid var(--panel-edge);
+    margin-top: 1.25rem;
+  }
+
+  .band-cell {
+    background: var(--graphite);
+    padding: 1.5rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .band-val {
+    font-family: var(--font-head);
+    font-size: clamp(1.8rem, 5vw, 2.5rem);
+    font-weight: 900;
+    line-height: 1;
+    color: var(--gold);
+  }
+
+  .band-label {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    color: var(--steel);
+    line-height: 1.5;
+  }
+
+  /* ── Responsive ──────────────────────────────────────────────────────────── */
+  @media (max-width: 620px) {
+    .headline-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .headline-card::before {
+      height: 1px;
+    }
+
+    .band-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .band-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

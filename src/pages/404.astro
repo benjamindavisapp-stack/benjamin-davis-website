@@ -1,0 +1,201 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import Lattice from '@/components/Lattice.astro';
+import Bolt    from '@/components/Bolt.astro';
+---
+
+<Layout
+  title="404 — Page Not Found · Benjamin Davis"
+  description="This page doesn't exist — but everything else on the site does."
+>
+
+  <section class="not-found">
+    <Lattice />
+    <Bolt position="tl" />
+    <Bolt position="tr" />
+    <Bolt position="bl" />
+    <Bolt position="br" />
+
+    <div class="container nf-body">
+
+      <div class="nf-card">
+        <Bolt position="tl" size={14} />
+        <Bolt position="tr" size={14} />
+        <Bolt position="bl" size={14} />
+        <Bolt position="br" size={14} />
+
+        <p class="nf-code">404</p>
+        <h1 class="nf-heading">Page not found.</h1>
+        <p class="nf-sub">
+          This address isn't machined into the site. Check the URL,
+          or navigate back to somewhere real.
+        </p>
+
+        <div class="nf-spec">
+          <div class="nf-row">
+            <span class="nf-key">Status</span>
+            <span class="nf-val">404 Not Found</span>
+          </div>
+          <div class="nf-row">
+            <span class="nf-key">Path</span>
+            <span class="nf-val nf-path" id="nf-path">—</span>
+          </div>
+          <div class="nf-row">
+            <span class="nf-key">Action</span>
+            <span class="nf-val">Return to known coordinates</span>
+          </div>
+        </div>
+
+        <div class="nf-links">
+          <a href="/" class="nf-btn-primary">← Home</a>
+          <a href="/research" class="nf-btn-ghost">Research</a>
+          <a href="/contact"  class="nf-btn-ghost">Contact</a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</Layout>
+
+<script>
+  const el = document.getElementById('nf-path');
+  if (el) el.textContent = window.location.pathname;
+</script>
+
+<style>
+  .not-found {
+    position: relative;
+    min-height: calc(100svh - var(--nav-height));
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .nf-body {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-block: 4rem;
+  }
+
+  .nf-card {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+    padding: 3rem 2.5rem 2.5rem;
+    background: color-mix(in srgb, var(--panel) 88%, transparent);
+    border: 1px solid var(--panel-edge);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .nf-code {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+
+  .nf-heading {
+    font-family: var(--font-head);
+    font-size: clamp(2.4rem, 8vw, 3.6rem);
+    font-weight: 900;
+    line-height: 0.93;
+    color: var(--text);
+  }
+
+  .nf-sub {
+    font-size: 0.88rem;
+    line-height: 1.65;
+    color: var(--steel);
+    max-width: 380px;
+  }
+
+  .nf-spec {
+    border: 1px solid var(--panel-edge);
+    margin-block: 0.5rem;
+  }
+
+  .nf-row {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .nf-row:last-child { border-bottom: none; }
+
+  .nf-key {
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--copper);
+    padding: 0.5rem 0.6rem;
+    border-right: 1px solid var(--panel-edge);
+    display: flex;
+    align-items: center;
+    background: color-mix(in srgb, var(--graphite) 60%, var(--panel));
+  }
+
+  .nf-val {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nf-path { color: var(--steel); }
+
+  .nf-links {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+  }
+
+  .nf-btn-primary,
+  .nf-btn-ghost {
+    display: inline-block;
+    padding: 0.55rem 1.2rem;
+    font-family: var(--font-head);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .nf-btn-primary {
+    background: var(--gold);
+    color: var(--graphite);
+    border: 1px solid var(--gold);
+  }
+  .nf-btn-primary:hover { background: var(--gold-bright); border-color: var(--gold-bright); color: var(--graphite); }
+
+  .nf-btn-ghost {
+    background: transparent;
+    color: var(--steel);
+    border: 1px solid var(--panel-edge);
+  }
+  .nf-btn-ghost:hover { color: var(--text); border-color: var(--steel); }
+
+  .nf-btn-primary:focus-visible,
+  .nf-btn-ghost:focus-visible {
+    outline: 2px solid var(--copper);
+    outline-offset: 3px;
+  }
+
+  @media (max-width: 360px) {
+    .nf-card {
+      padding: 2.5rem 1.25rem 2rem;
+    }
+  }
+</style>

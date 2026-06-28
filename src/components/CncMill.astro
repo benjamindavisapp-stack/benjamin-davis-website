@@ -1,0 +1,1048 @@
+---
+// CncMill.astro — Brass relief-machined nameplate animation.
+// Three-pass CNC: raster roughing (R1) → semi-finish raster (R2) → contour+counter finishing (R4).
+// Letters are left standing (raised); endmill clears the surrounding field.
+---
+
+<canvas class="cnc-stock" aria-hidden="true"></canvas>
+<canvas class="cnc-fx"    aria-hidden="true"></canvas>
+
+<style>
+  .cnc-stock,
+  .cnc-fx {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: block;
+  }
+  .cnc-stock { z-index: 10; }
+  .cnc-fx    { z-index: 11; }
+
+  /* Canvas provides the name visual — keep h1 in DOM for a11y/SEO only */
+  :global(.cnc-nameplate .np-name) {
+    visibility: hidden;
+  }
+
+  /* After animation: raise supporting content above the brass canvas (z-index:1) */
+  :global(.cnc-done .np-location),
+  :global(.cnc-done .np-rule),
+  :global(.cnc-done .np-role),
+  :global(.cnc-done .np-tapped) {
+    position: relative;
+    z-index: 3;
+  }
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ── Canvas factory ─────────────────────────────────────────────────────── */
+  function mkCanvas(w: number, h: number): HTMLCanvasElement {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+
+  /* ── Entry ──────────────────────────────────────────────────────────────── */
+  function init() {
+    const stockEl = document.querySelector<HTMLCanvasElement>('.cnc-stock');
+    const fxEl    = document.querySelector<HTMLCanvasElement>('.cnc-fx');
+    if (!stockEl || !fxEl) return;
+    const parent = stockEl.parentElement!;
+    parent.classList.add('cnc-nameplate');
+    document.fonts.ready.then(() => setup(stockEl, fxEl, parent));
+  }
+
+  /* ── Main setup ─────────────────────────────────────────────────────────── */
+  function setup(stockEl: HTMLCanvasElement, fxEl: HTMLCanvasElement, parent: HTMLElement) {
+    const rect = parent.getBoundingClientRect();
+    const W = Math.floor(rect.width);
+    const H = Math.floor(rect.height);
+    if (W < 100 || H < 60) {
+      parent.classList.remove('cnc-nameplate'); // let h1 show on tiny screens
+      showDone(stockEl, fxEl, parent);
+      return;
+    }
+
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const PW  = Math.round(W * DPR);
+    const PH  = Math.round(H * DPR);
+
+    [stockEl, fxEl].forEach(c => {
+      c.width = PW; c.height = PH;
+      c.style.width = W + 'px'; c.style.height = H + 'px';
+    });
+    const sCtx = stockEl.getContext('2d')!;
+    const fCtx = fxEl.getContext('2d')!;
+    sCtx.scale(DPR, DPR);
+    fCtx.scale(DPR, DPR);
+
+    /* ── Text layout ─────────────────────────────────────────────────────── */
+    const fontSize = Math.min(Math.floor(W * 0.235), 86);
+    const FONT     = `900 ${fontSize}px 'Saira Condensed', 'Arial Narrow', sans-serif`;
+    const lineH    = fontSize * 0.92;
+    const capH     = fontSize * 0.70;
+    const L1Y      = (H - capH - lineH) / 2 + capH;  // BENJAMIN baseline
+    const L2Y      = L1Y + lineH;                      // DAVIS baseline
+
+    /* ── Tool params ─────────────────────────────────────────────────────── */
+    const R      = Math.max(7, Math.min(12, W * 0.022));
+    const R1     = R;          // pass 1: roughing endmill radius
+    const R2     = R / 2;      // pass 2: semi-finish endmill radius
+    const R4     = R / 4;      // pass 3: finishing endmill radius
+    const FEED_R = W * 2.80;   // roughing feed px/s
+    const FEED_SF = W * 2.00;  // semi-finish feed px/s (pass 2, smaller tool)
+    const FEED_F = W * 1.30;   // finishing feed px/s
+    const RAPID  = W * 5.0;    // traverse speed px/s
+    const SPIN   = Math.PI * 14;
+    const SHX    = Math.ceil(R * 0.45);
+    const SHY    = Math.ceil(R * 0.62);
+
+    /* ── Pre-render: brass top surface ───────────────────────────────────── */
+    const brassOff = mkCanvas(PW, PH);
+    const brCtx    = brassOff.getContext('2d')!;
+    brCtx.scale(DPR, DPR);
+    renderBrass(brCtx, W, H);
+
+    /* ── Pre-render: machined field texture ──────────────────────────────── */
+    const fieldOff = mkCanvas(PW, PH);
+    const fiCtx    = fieldOff.getContext('2d')!;
+    fiCtx.scale(DPR, DPR);
+    renderField(fiCtx, W, H, R1);
+
+    /* ── Pre-render: letter mask (transparent bg, white letters) ─────────── */
+    const maskOff = mkCanvas(PW, PH);
+    const mCtx    = maskOff.getContext('2d')!;
+    mCtx.scale(DPR, DPR);
+    mCtx.font = FONT;
+    mCtx.textAlign = 'center';
+    mCtx.textBaseline = 'alphabetic';
+    mCtx.fillStyle = '#fff';
+    mCtx.fillText('BENJAMIN', W / 2, L1Y);
+    mCtx.fillText('DAVIS',    W / 2, L2Y);
+
+    /* ── Pre-render: drop shadow shape ───────────────────────────────────── */
+    // Dark fill masked to offset-text shape, minus the letter body itself
+    const shadowOff = mkCanvas(PW, PH);
+    const shCtx     = shadowOff.getContext('2d')!;
+    shCtx.scale(DPR, DPR);
+    shCtx.fillStyle = 'rgba(0,0,0,0.68)';
+    shCtx.fillRect(0, 0, W, H);
+    shCtx.globalCompositeOperation = 'destination-in';
+    shCtx.font = FONT; shCtx.textAlign = 'center'; shCtx.textBaseline = 'alphabetic';
+    shCtx.fillStyle = '#fff';
+    shCtx.fillText('BENJAMIN', W / 2 + SHX, L1Y + SHY);
+    shCtx.fillText('DAVIS',    W / 2 + SHX, L2Y + SHY);
+    shCtx.globalCompositeOperation = 'destination-out';
+    shCtx.fillText('BENJAMIN', W / 2, L1Y);
+    shCtx.fillText('DAVIS',    W / 2, L2Y);
+    shCtx.globalCompositeOperation = 'source-over';
+
+    /* ── Cut accumulation map (grows each frame) ─────────────────────────── */
+    const cutOff = mkCanvas(PW, PH);
+    const cuCtx  = cutOff.getContext('2d')!;
+    cuCtx.scale(DPR, DPR);
+
+    /* ── Near-pass reveal map (same strokes, no letter exclusion) ────────── */
+    // Round stroke caps bleed into letter edges — letters emerge as tool passes
+    const nearOff = mkCanvas(PW, PH);
+    const neCtx   = nearOff.getContext('2d')!;
+    neCtx.scale(DPR, DPR);
+
+    /* ── Settled chip surface ────────────────────────────────────────────── */
+    const settledOff = mkCanvas(PW, PH);
+    const seCtx      = settledOff.getContext('2d')!;
+    seCtx.scale(DPR, DPR);
+
+    /* ── Chips that settled on raised letter faces ───────────────────────── */
+    const letterChipsOff = mkCanvas(PW, PH);
+    const lcCtx          = letterChipsOff.getContext('2d')!;
+    lcCtx.scale(DPR, DPR);
+
+    /* ── Compositing scratch pad ─────────────────────────────────────────── */
+    const tmpOff = mkCanvas(PW, PH);
+    const tmCtx  = tmpOff.getContext('2d')!;
+    tmCtx.scale(DPR, DPR);
+
+    /* ── Pixel sample canvas for inLetter queries ────────────────────────── */
+    const sampC   = mkCanvas(W, H);
+    const sampCtx = sampC.getContext('2d')!;
+    sampCtx.font = FONT; sampCtx.textAlign = 'center'; sampCtx.textBaseline = 'alphabetic';
+    sampCtx.fillStyle = '#fff';
+    sampCtx.fillText('BENJAMIN', W / 2, L1Y);
+    sampCtx.fillText('DAVIS',    W / 2, L2Y);
+    const mpx = sampCtx.getImageData(0, 0, W, H).data;
+
+    function inLetter(x: number, y: number): boolean {
+      const xi = Math.max(0, Math.min(W - 1, Math.round(x)));
+      const yi = Math.max(0, Math.min(H - 1, Math.round(y)));
+      return mpx[(yi * W + xi) * 4] > 60;
+    }
+
+    /* ── Extract letter silhouettes (per-column top/bottom pixel) ────────── */
+    function extractSil(yLo: number, yHi: number) {
+      const y0 = Math.max(0, Math.floor(yLo));
+      const y1 = Math.min(H - 1, Math.ceil(yHi));
+      const cols: { x: number; yt: number; yb: number }[] = [];
+      for (let x = 0; x < W; x++) {
+        let yt = -1, yb = -1;
+        for (let y = y0; y <= y1; y++) {
+          if (mpx[(y * W + x) * 4] > 60) { if (yt < 0) yt = y; yb = y; }
+        }
+        if (yt >= 0) cols.push({ x, yt, yb });
+      }
+      return cols;
+    }
+
+    /* ── Path point type ─────────────────────────────────────────────────── */
+    interface RPt { x: number; y: number; isGap?: boolean; }
+
+    /* ── Danger maps: 1 = tool centre would contact a letter pixel ───────── */
+    function buildDangerMap(r: number): Uint8Array {
+      const dm = new Uint8Array(W * H);
+      const ir = Math.ceil(r);
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          if (mpx[(y * W + x) * 4] <= 60) continue;
+          for (let dy2 = -ir; dy2 <= ir; dy2++) {
+            const ny = y + dy2; if (ny < 0 || ny >= H) continue;
+            for (let dx2 = -ir; dx2 <= ir; dx2++) {
+              if (dx2 * dx2 + dy2 * dy2 > r * r) continue;
+              const nx = x + dx2; if (nx < 0 || nx >= W) continue;
+              dm[ny * W + nx] = 1;
+            }
+          }
+        }
+      }
+      return dm;
+    }
+
+    const dmR1 = buildDangerMap(R1);
+    const dmR2 = buildDangerMap(R2);
+
+    /* ── Raster path: bidirectional zigzag scan ──────────────────────────── */
+    function buildRasterPath(
+      toolR: number, stepover: number, dm: Uint8Array,
+      yLo = toolR, yHi = H - toolR
+    ): RPt[] {
+      const path: RPt[] = [];
+      let rightward = true;
+      const margin = Math.ceil(toolR);
+      for (let iy = yLo; iy <= yHi; iy += stepover) {
+        const yi = Math.min(H - 1, Math.max(0, Math.round(iy)));
+        const segs: { x0: number; x1: number }[] = [];
+        let segStart = -1;
+        for (let x = margin; x <= W - margin; x++) {
+          const safe = dm[yi * W + x] === 0;
+          if (safe && segStart < 0) { segStart = x; }
+          else if (!safe && segStart >= 0) { segs.push({ x0: segStart, x1: x - 1 }); segStart = -1; }
+        }
+        if (segStart >= 0) segs.push({ x0: segStart, x1: W - margin });
+        if (rightward) {
+          for (const s of segs) { path.push({ x: s.x0, y: iy, isGap: true }); path.push({ x: s.x1, y: iy }); }
+        } else {
+          for (const s of [...segs].reverse()) { path.push({ x: s.x1, y: iy, isGap: true }); path.push({ x: s.x0, y: iy }); }
+        }
+        rightward = !rightward;
+      }
+      return path;
+    }
+
+    /* ── Letter silhouettes + y extents for pass 2 targeting ────────────── */
+    const sil1 = extractSil(L1Y - capH - 4, L1Y + 3);
+    const sil2 = extractSil(L2Y - capH - 4, L2Y + 3);
+    let lyMin = H, lyMax = 0;
+    for (const c of [...sil1, ...sil2]) {
+      if (c.yt < lyMin) lyMin = c.yt;
+      if (c.yb > lyMax) lyMax = c.yb;
+    }
+
+    // Pass 1: full-width raster at stepover R1
+    const rasterPath1 = buildRasterPath(R1, R1, dmR1);
+    // Pass 2: semi-finish raster limited to letter y-band, stepover R2
+    const rasterPath2 = buildRasterPath(R2, R2, dmR2,
+      Math.max(R2, lyMin - R1 * 2),
+      Math.min(H - R2, lyMax + R1 * 2));
+
+    /* ── Outer finishing: trace word contours at R4+1 offset ────────────── */
+    function mkFinOuter(sil: { x: number; yt: number; yb: number }[]): RPt[] {
+      if (!sil.length) return [];
+      const OFF = R4 + 1;
+      const bot = sil.map(c => ({ x: c.x, y: c.yb + OFF }));
+      const top = sil.slice().reverse().map(c => ({ x: c.x, y: c.yt - OFF }));
+      const first: RPt = { x: bot[0].x, y: bot[0].y, isGap: true };
+      return [first, ...bot.slice(1), ...top];
+    }
+    const finOuterPath: RPt[] = [...mkFinOuter(sil1), ...mkFinOuter(sil2)];
+
+    /* ── Counter finishing: trace enclosed letter voids (B/D/A bowls) ───── */
+    function findCounters(): { cx: number; cy: number; rw: number; rh: number }[] {
+      const outside = new Uint8Array(W * H);
+      const q: number[] = [];
+      for (let x = 0; x < W; x++) {
+        for (const y of [0, H - 1]) {
+          const i = y * W + x;
+          if (!outside[i] && mpx[i * 4] <= 60) { outside[i] = 1; q.push(i); }
+        }
+      }
+      for (let y = 1; y < H - 1; y++) {
+        for (const x of [0, W - 1]) {
+          const i = y * W + x;
+          if (!outside[i] && mpx[i * 4] <= 60) { outside[i] = 1; q.push(i); }
+        }
+      }
+      let qi = 0;
+      while (qi < q.length) {
+        const i = q[qi++];
+        const x = i % W, y = (i / W) | 0;
+        if (x > 0)     { const n = i - 1; if (!outside[n] && mpx[n * 4] <= 60) { outside[n] = 1; q.push(n); } }
+        if (x < W - 1) { const n = i + 1; if (!outside[n] && mpx[n * 4] <= 60) { outside[n] = 1; q.push(n); } }
+        if (y > 0)     { const n = i - W; if (!outside[n] && mpx[n * 4] <= 60) { outside[n] = 1; q.push(n); } }
+        if (y < H - 1) { const n = i + W; if (!outside[n] && mpx[n * 4] <= 60) { outside[n] = 1; q.push(n); } }
+      }
+      const labeled = new Uint8Array(W * H);
+      const ctrs: { cx: number; cy: number; rw: number; rh: number }[] = [];
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const i = y * W + x;
+          if (labeled[i] || outside[i] || mpx[i * 4] > 60) continue;
+          const cq: number[] = [i]; labeled[i] = 1;
+          let qi2 = 0, mnX = x, mxX = x, mnY = y, mxY = y, sX = 0, sY = 0, cnt = 0;
+          while (qi2 < cq.length) {
+            const ci = cq[qi2++], cx = ci % W, cy = (ci / W) | 0;
+            if (cx < mnX) mnX = cx; if (cx > mxX) mxX = cx;
+            if (cy < mnY) mnY = cy; if (cy > mxY) mxY = cy;
+            sX += cx; sY += cy; cnt++;
+            if (cx > 0)     { const n = ci - 1; if (!labeled[n] && !outside[n] && mpx[n * 4] <= 60) { labeled[n] = 1; cq.push(n); } }
+            if (cx < W - 1) { const n = ci + 1; if (!labeled[n] && !outside[n] && mpx[n * 4] <= 60) { labeled[n] = 1; cq.push(n); } }
+            if (cy > 0)     { const n = ci - W; if (!labeled[n] && !outside[n] && mpx[n * 4] <= 60) { labeled[n] = 1; cq.push(n); } }
+            if (cy < H - 1) { const n = ci + W; if (!labeled[n] && !outside[n] && mpx[n * 4] <= 60) { labeled[n] = 1; cq.push(n); } }
+          }
+          if (cnt >= 20) ctrs.push({ cx: sX / cnt, cy: sY / cnt, rw: (mxX - mnX) / 2, rh: (mxY - mnY) / 2 });
+        }
+      }
+      return ctrs;
+    }
+
+    function buildCounterPaths(): RPt[] {
+      const path: RPt[] = [];
+      for (const ctr of findCounters()) {
+        const rw = ctr.rw - R4, rh = ctr.rh - R4;
+        if (rw < R4 || rh < R4) continue;
+        const N = Math.max(10, Math.ceil(Math.PI * (rw + rh) / 3));
+        for (let i = 0; i <= N; i++) {
+          const a = (i / N) * Math.PI * 2;
+          const pt: RPt = { x: ctr.cx + rw * Math.cos(a), y: ctr.cy + rh * Math.sin(a) };
+          if (i === 0) pt.isGap = true;
+          path.push(pt);
+        }
+      }
+      return path;
+    }
+    const ctrPath = buildCounterPaths();
+
+    // True once finishing passes are done — triggers full letter reveal
+    let animDone = false;
+    let animTime = 0;  // seconds since animation start, drives specular drift
+
+    /* ── Per-frame composite onto sCtx ──────────────────────────────────── */
+    function composite() {
+      sCtx.clearRect(0, 0, W, H);
+
+      // 1. Brass base (full nameplate)
+      sCtx.drawImage(brassOff, 0, 0, W, H);
+
+      // 1b. Drifting anisotropic specular — slow oscillation mimics real metal under light
+      {
+        const drift = Math.sin(animTime * 0.20) * W * 0.055;
+        const sp = sCtx.createLinearGradient(W * 0.08 + drift, 0, W * 0.92 + drift, H);
+        sp.addColorStop(0,    'rgba(255,244,158,0)');
+        sp.addColorStop(0.36, 'rgba(255,244,158,0.10)');
+        sp.addColorStop(0.50, 'rgba(255,244,158,0.26)');
+        sp.addColorStop(0.64, 'rgba(255,244,158,0.09)');
+        sp.addColorStop(1,    'rgba(255,244,158,0)');
+        sCtx.fillStyle = sp;
+        sCtx.fillRect(0, 0, W, H);
+      }
+
+      // 2. Machined field where cut (fieldOff intersect cutOff)
+      tmCtx.clearRect(0, 0, W, H);
+      tmCtx.drawImage(fieldOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'destination-in';
+      tmCtx.drawImage(cutOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'source-over';
+      sCtx.drawImage(tmpOff, 0, 0, W, H);
+
+      // 3. Settled chips (in cut field only)
+      tmCtx.clearRect(0, 0, W, H);
+      tmCtx.drawImage(settledOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'destination-in';
+      tmCtx.drawImage(cutOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'source-over';
+      sCtx.drawImage(tmpOff, 0, 0, W, H);
+
+      // 4. Drop shadows cast by raised letters onto cut field (shadowOff intersect cutOff)
+      tmCtx.clearRect(0, 0, W, H);
+      tmCtx.drawImage(shadowOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'destination-in';
+      tmCtx.drawImage(cutOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'source-over';
+      sCtx.globalAlpha = 0.80;
+      sCtx.drawImage(tmpOff, 0, 0, W, H);
+      sCtx.globalAlpha = 1;
+
+      // 5. Raised letters — hidden until endmill has passed nearby
+      tmCtx.clearRect(0, 0, W, H);
+      tmCtx.drawImage(brassOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'destination-in';
+      tmCtx.drawImage(maskOff, 0, 0, W, H);
+      if (!animDone) {
+        tmCtx.globalCompositeOperation = 'destination-in';
+        tmCtx.drawImage(nearOff, 0, 0, W, H);
+      }
+      tmCtx.globalCompositeOperation = 'source-over';
+      sCtx.drawImage(tmpOff, 0, 0, W, H);
+
+      // 6. Top-rim edge highlight — revealed progressively as tool passes
+      tmCtx.clearRect(0, 0, W, H);
+      tmCtx.save();
+      tmCtx.font = FONT; tmCtx.textAlign = 'center'; tmCtx.textBaseline = 'alphabetic';
+      tmCtx.strokeStyle = 'rgba(255,242,165,0.72)';
+      tmCtx.lineWidth = 1.8; tmCtx.lineJoin = 'round';
+      tmCtx.strokeText('BENJAMIN', W / 2, L1Y);
+      tmCtx.strokeText('DAVIS',    W / 2, L2Y);
+      tmCtx.restore();
+      if (!animDone) {
+        tmCtx.globalCompositeOperation = 'destination-in';
+        tmCtx.drawImage(nearOff, 0, 0, W, H);
+        tmCtx.globalCompositeOperation = 'source-over';
+      }
+      sCtx.drawImage(tmpOff, 0, 0, W, H);
+
+      // 6b. Chips on letter faces — above the letter surface so they're visible
+      tmCtx.clearRect(0, 0, W, H);
+      tmCtx.drawImage(letterChipsOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'destination-in';
+      tmCtx.drawImage(maskOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'source-over';
+      sCtx.drawImage(tmpOff, 0, 0, W, H);
+
+      // 7. Shaded letter walls (shadow side = lower-right, in cut field only)
+      tmCtx.clearRect(0, 0, W, H);
+      tmCtx.font = FONT; tmCtx.textAlign = 'center'; tmCtx.textBaseline = 'alphabetic';
+      tmCtx.fillStyle = 'rgba(25,12,0,0.52)';
+      tmCtx.fillText('BENJAMIN', W / 2 + 2, L1Y + 2.5);
+      tmCtx.fillText('DAVIS',    W / 2 + 2, L2Y + 2.5);
+      tmCtx.globalCompositeOperation = 'destination-in';
+      tmCtx.drawImage(cutOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'destination-out';
+      tmCtx.drawImage(maskOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'source-over';
+      sCtx.drawImage(tmpOff, 0, 0, W, H);
+    }
+
+    /* ── Advance cut map: stroke a channel from (fromX,fromY) to (x,y) ─── */
+    function cut(x: number, y: number, fromX = x, fromY = y, w = R * 2.2) {
+      cuCtx.strokeStyle = '#fff';
+      cuCtx.lineWidth   = w;
+      cuCtx.lineCap     = 'round';
+      cuCtx.lineJoin    = 'round';
+      cuCtx.beginPath();
+      cuCtx.moveTo(fromX, fromY);
+      cuCtx.lineTo(x, y);
+      cuCtx.stroke();
+      cuCtx.globalCompositeOperation = 'destination-out';
+      cuCtx.drawImage(maskOff, 0, 0, W, H);
+      cuCtx.globalCompositeOperation = 'source-over';
+      // Near-pass: same stroke without letter exclusion — round caps bleed into
+      // letter boundaries, progressively illuminating raised letter edges
+      neCtx.strokeStyle = '#fff';
+      neCtx.lineWidth   = w;
+      neCtx.lineCap     = 'round';
+      neCtx.lineJoin    = 'round';
+      neCtx.beginPath();
+      neCtx.moveTo(fromX, fromY);
+      neCtx.lineTo(x, y);
+      neCtx.stroke();
+    }
+
+    /* ── Endmill ─────────────────────────────────────────────────────────── */
+    function drawMill(
+      ctx: CanvasRenderingContext2D,
+      cx: number, cy: number, r: number,
+      angle: number, cutting: boolean, lifted: boolean
+    ) {
+      const FLUTES = 4, TRAIL = 5, TGAP = 0.20, SWEEP = 0.65;
+      const DETAIL_MIN = 4; // below this radius skip flutes, render simplified disk
+
+      // Drop shadow — larger when lifted (in rapid/approach)
+      const sc  = lifted ? 0.28 : 0.13;
+      const sr  = r * (lifted ? 1.80 : 1.42);
+      const shd = ctx.createRadialGradient(cx + r*sc, cy + r*sc*1.5, 0, cx + r*sc, cy + r*sc*1.5, sr);
+      shd.addColorStop(0,   'rgba(0,0,0,0.52)');
+      shd.addColorStop(0.4, 'rgba(0,0,0,0.16)');
+      shd.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = shd;
+      ctx.beginPath();
+      ctx.ellipse(cx + r*sc, cy + r*sc*1.55, sr, sr * 0.62, 0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Body
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = '#2c3040'; ctx.fill();
+
+      if (r >= DETAIL_MIN) {
+        // 3-D lit shading (key light upper-left)
+        const lit = ctx.createRadialGradient(
+          cx - r * 0.40, cy - r * 0.38, r * 0.03,
+          cx + r * 0.10, cy + r * 0.10, r * 1.05
+        );
+        lit.addColorStop(0,    'rgba(188,198,220,1)');
+        lit.addColorStop(0.22, 'rgba(110,122,144,0.95)');
+        lit.addColorStop(0.60, 'rgba(44,48,64,0.92)');
+        lit.addColorStop(1,    'rgba(10,11,16,1)');
+        ctx.fillStyle = lit; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+
+        // Helical flutes with angular motion-blur trail
+        for (let t = TRAIL; t >= 0; t--) {
+          const ta = angle - t * TGAP;
+          const al = t === 0 ? 0.95 : ((TRAIL - t + 0.8) / (TRAIL + 1)) * 0.55;
+          ctx.save(); ctx.globalAlpha = al;
+          for (let f = 0; f < FLUTES; f++) {
+            const fa  = ta + (f / FLUTES) * Math.PI * 2;
+            const x1  = cx + r * 0.28 * Math.cos(fa);
+            const y1  = cy + r * 0.28 * Math.sin(fa);
+            const x2  = cx + r * 0.90 * Math.cos(fa + SWEEP);
+            const y2  = cy + r * 0.90 * Math.sin(fa + SWEEP);
+            const cpx = cx + r * 0.60 * Math.cos(fa + SWEEP * 0.46);
+            const cpy = cy + r * 0.60 * Math.sin(fa + SWEEP * 0.46);
+            ctx.strokeStyle = t === 0 ? 'rgba(226,234,252,0.93)' : 'rgba(165,176,202,0.82)';
+            ctx.lineWidth   = t === 0 ? 1.22 : 0.72;
+            ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(x1, y1);
+            ctx.quadraticCurveTo(cpx, cpy, x2, y2); ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        // Center bore
+        ctx.beginPath(); ctx.arc(cx, cy, r * 0.27, 0, Math.PI * 2);
+        ctx.fillStyle = '#090a0e'; ctx.fill();
+        ctx.strokeStyle = 'rgba(60,66,82,0.9)'; ctx.lineWidth = 0.72; ctx.stroke();
+      } else {
+        // Tiny finishing tool — simplified bright spot so it remains visible
+        const lit2 = ctx.createRadialGradient(cx - r*0.3, cy - r*0.3, 0, cx, cy, r);
+        lit2.addColorStop(0, 'rgba(200,212,235,1)');
+        lit2.addColorStop(1, 'rgba(44,50,68,1)');
+        ctx.fillStyle = lit2; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // Rim highlight (always)
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.975, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(142,158,185,0.52)'; ctx.lineWidth = 1.2; ctx.stroke();
+
+      // Cutting heat glow (always when cutting)
+      if (cutting && !lifted) {
+        const halo = ctx.createRadialGradient(cx, cy, r * 0.68, cx, cy, r * 1.82);
+        halo.addColorStop(0,    'rgba(255,196,55,0)');
+        halo.addColorStop(0.60, 'rgba(255,172,35,0.18)');
+        halo.addColorStop(1,    'rgba(255,112,10,0)');
+        ctx.fillStyle = halo;
+        ctx.beginPath(); ctx.arc(cx, cy, r * 1.82, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    /* ── Chips ───────────────────────────────────────────────────────────── */
+    interface Chip {
+      x: number; y: number; vx: number; vy: number;
+      len: number; ang: number; curl: number; life: number; w: number;
+    }
+    const chips: Chip[] = [];
+    const MAX_CHIPS = W < 360 ? 80 : 200;
+
+    function emitChip(cx: number, cy: number, dirX: number) {
+      if (chips.length >= MAX_CHIPS) return;
+      const side = dirX > 0 ? -1 : 1;
+      const ba   = Math.atan2(side, dirX * 0.42) + (Math.random() - 0.5) * 1.25;
+      chips.push({
+        x:    cx + (Math.random() - 0.5) * R * 0.85,
+        y:    cy + (Math.random() - 0.5) * R * 0.5,
+        vx:   Math.cos(ba) * (Math.random() * 3.2 + 1.4),
+        vy:   Math.sin(ba) * (Math.random() * 2.6 + 0.8) - Math.random() * 0.8,
+        len:  Math.random() * 4.5 + 1.5,
+        ang:  ba + (Math.random() - 0.5) * 0.9,
+        curl: (Math.random() - 0.5) * 3.8,
+        life: 1.0 + Math.random() * 0.55,
+        w:    Math.random() * 1.0 + 0.3,
+      });
+    }
+
+    function emitBigChip(cx: number, cy: number, dirX: number) {
+      if (chips.length >= MAX_CHIPS) return;
+      const side = dirX > 0 ? -1 : 1;
+      const ba   = Math.atan2(side * 0.8, dirX * 0.3) + (Math.random() - 0.5) * 0.8;
+      chips.push({
+        x:    cx + (Math.random() - 0.5) * R * 0.6,
+        y:    cy + (Math.random() - 0.5) * R * 0.4,
+        vx:   Math.cos(ba) * (Math.random() * 5.0 + 2.5),
+        vy:   Math.sin(ba) * (Math.random() * 3.8 + 1.2) - Math.random() * 1.2,
+        len:  Math.random() * 8 + 3,
+        ang:  ba + (Math.random() - 0.5) * 0.6,
+        curl: (Math.random() - 0.5) * 5.5,
+        life: 1.3 + Math.random() * 0.7,
+        w:    Math.random() * 1.8 + 0.8,
+      });
+    }
+
+    // Needle chips — straight brittle shards, characteristic of free-machining brass (C360)
+    function emitNeedle(cx: number, cy: number, dirX: number) {
+      if (chips.length >= MAX_CHIPS) return;
+      const ba = Math.atan2((dirX > 0 ? -0.3 : 0.3), dirX * 0.7) + (Math.random() - 0.5) * 0.6;
+      chips.push({
+        x:    cx + (Math.random() - 0.5) * R * 0.6,
+        y:    cy + (Math.random() - 0.5) * R * 0.3,
+        vx:   Math.cos(ba) * (Math.random() * 4.5 + 2.0),
+        vy:   Math.sin(ba) * (Math.random() * 2.0 + 0.5) - Math.random() * 0.6,
+        len:  Math.random() * 3.5 + 1.0,
+        ang:  ba + (Math.random() - 0.5) * 0.15,
+        curl: (Math.random() - 0.5) * 0.35,
+        life: 0.9 + Math.random() * 0.4,
+        w:    Math.random() * 0.4 + 0.15,
+      });
+    }
+
+    function tickChips() {
+      for (let i = chips.length - 1; i >= 0; i--) {
+        const c = chips[i];
+        c.x += c.vx; c.y += c.vy;
+        c.vy += 0.24; c.vx *= 0.968;
+        c.life -= 0.052;
+
+        const spd = Math.hypot(c.vx, c.vy);
+        if (spd < 0.6 && c.life > 0 && c.y > 0 && c.y < H + 20) {
+          // Route chip to letter surface or machined field by landing position
+          const target = inLetter(Math.round(c.x), Math.round(c.y)) ? lcCtx : seCtx;
+          const ex  = c.x + Math.cos(c.ang) * c.len;
+          const ey  = c.y + Math.sin(c.ang) * c.len;
+          const mx  = c.x + Math.cos(c.ang + c.curl * 0.5) * c.len * 0.55;
+          const my  = c.y + Math.sin(c.ang + c.curl * 0.5) * c.len * 0.55;
+          target.strokeStyle = `rgba(188,138,32,0.68)`;
+          target.lineWidth = c.w; target.lineCap = 'round';
+          target.beginPath(); target.moveTo(c.x, c.y);
+          target.quadraticCurveTo(mx, my, ex, ey); target.stroke();
+          chips.splice(i, 1);
+          continue;
+        }
+
+        if (c.life <= 0) { chips.splice(i, 1); continue; }
+
+        const al  = Math.min(c.life, 1);
+        const ex  = c.x + Math.cos(c.ang) * c.len;
+        const ey2 = c.y + Math.sin(c.ang) * c.len;
+        const mx  = c.x + Math.cos(c.ang + c.curl * 0.5) * c.len * 0.55;
+        const my  = c.y + Math.sin(c.ang + c.curl * 0.5) * c.len * 0.55;
+        fCtx.save();
+        fCtx.strokeStyle = `rgba(212,164,42,${(al * 0.95).toFixed(2)})`;
+        fCtx.lineWidth = c.w; fCtx.lineCap = 'round';
+        fCtx.beginPath(); fCtx.moveTo(c.x, c.y);
+        fCtx.quadraticCurveTo(mx, my, ex, ey2); fCtx.stroke();
+        fCtx.restore();
+      }
+    }
+
+    /* ── Finalise: drop canvas behind content, expose supporting elements ── */
+    function finalise() {
+      fxEl.style.display = 'none';
+      stockEl.style.zIndex = '1';
+      parent.classList.add('cnc-done');
+    }
+
+    /* ── Immediate done (reduced-motion) ────────────────────────────────── */
+    if (REDUCED) {
+      cuCtx.fillStyle = '#fff'; cuCtx.fillRect(0, 0, W, H);
+      cuCtx.globalCompositeOperation = 'destination-out';
+      cuCtx.drawImage(maskOff, 0, 0, W, H);
+      cuCtx.globalCompositeOperation = 'source-over';
+      animDone = true;
+      composite();
+      finalise();
+      return;
+    }
+
+    /* ── Animation state machine ─────────────────────────────────────────── */
+    type Phase =
+      | 'approach'
+      | 'rough1'    | 'r2_rapid'  | 'rough2'
+      | 'fin_rapid' | 'finishing'
+      | 'ctr_rapid' | 'counters'
+      | 'settle'
+      | 'retract'   | 'done';
+
+    const approachDest = rasterPath1.length > 0 ? rasterPath1[0] : { x: W / 2, y: R1 };
+
+    let phase: Phase = 'approach';
+    let tx     = W / 2;
+    let ty     = -R1 * 4;
+    let spinA  = 0;
+    let pathIdx  = 0;
+    let appT     = 0;
+    let settleT  = 0;
+    let lifted   = true;
+    let curR     = R1;
+    let lastTs: number | null = null;
+    let lastCutX = -1;
+    let lastCutY = -1;
+
+    // Show initial brass immediately before rAF starts
+    composite();
+
+    function frame(ts: number) {
+      if (!lastTs) lastTs = ts;
+      const dt = Math.min((ts - lastTs) / 1000, 0.05);
+      lastTs = ts;
+      animTime += dt;
+
+      spinA += SPIN * dt;
+      fCtx.clearRect(0, 0, W, H);
+      let cutting = false;
+
+      /* ── APPROACH ────────────────────────────────────────────────────── */
+      if (phase === 'approach') {
+        appT = Math.min(appT + dt / 0.55, 1);
+        const ease = appT * appT * (3 - 2 * appT);
+        tx = W / 2 + (approachDest.x - W / 2) * ease;
+        ty = -R1 * 4 + (approachDest.y - (-R1 * 4)) * ease;
+        lifted = true;
+        if (appT >= 1) {
+          tx = approachDest.x; ty = approachDest.y;
+          phase = rasterPath1.length > 0 ? 'rough1' : 'fin_rapid';
+          pathIdx = 0; lifted = false;
+        }
+      }
+
+      /* ── PASS 1: raster roughing (tool R1, constant feed) ───────────── */
+      else if (phase === 'rough1') {
+        if (pathIdx >= rasterPath1.length) {
+          if (rasterPath2.length > 0) { phase = 'r2_rapid'; curR = R2; }
+          else { phase = 'fin_rapid'; curR = R4; }
+          pathIdx = 0;
+        } else {
+          let budget = FEED_R * dt;
+          while (budget > 0 && pathIdx < rasterPath1.length) {
+            const pt   = rasterPath1[pathIdx];
+            const isGap = !!pt.isGap;
+            const spd  = isGap ? RAPID : FEED_R;
+            const dx   = pt.x - tx, dy = pt.y - ty;
+            const dist = Math.hypot(dx, dy);
+            lifted = isGap; cutting = !isGap;
+            if (dist <= 1.5) {
+              if (!isGap) {
+                cut(pt.x, pt.y, tx, ty, R1 * 2.2);
+                if (Math.random() < 0.40) emitChip(pt.x, pt.y, dx >= 0 ? 1 : -1);
+                if (Math.random() < 0.06) emitBigChip(pt.x, pt.y, dx >= 0 ? 1 : -1);
+                if (Math.random() < 0.22) emitNeedle(pt.x, pt.y, dx >= 0 ? 1 : -1);
+              }
+              tx = pt.x; ty = pt.y; pathIdx++;
+              budget -= isGap ? dist * (FEED_R / RAPID) : dist;
+            } else {
+              const s = Math.min(spd * dt / dist, 1);
+              const nx = tx + dx * s, ny = ty + dy * s;
+              if (!isGap) {
+                cut(nx, ny, tx, ty, R1 * 2.2);
+                if (Math.random() < 0.40) emitChip(nx, ny, dx >= 0 ? 1 : -1);
+                if (Math.random() < 0.05) emitBigChip(nx, ny, dx >= 0 ? 1 : -1);
+                if (Math.random() < 0.22) emitNeedle(nx, ny, dx >= 0 ? 1 : -1);
+              }
+              tx = nx; ty = ny; budget = 0;
+            }
+          }
+          if (pathIdx >= rasterPath1.length) {
+            if (rasterPath2.length > 0) { phase = 'r2_rapid'; curR = R2; }
+            else { phase = 'fin_rapid'; curR = R4; }
+            pathIdx = 0;
+          }
+        }
+      }
+
+      /* ── RAPID TO PASS 2 START ───────────────────────────────────────── */
+      else if (phase === 'r2_rapid') {
+        lifted = true; cutting = false;
+        if (!rasterPath2.length) { phase = 'fin_rapid'; pathIdx = 0; curR = R4; }
+        else {
+          const dest = rasterPath2[0];
+          const dx = dest.x - tx, dy = dest.y - ty;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 3) { tx = dest.x; ty = dest.y; phase = 'rough2'; pathIdx = 0; }
+          else { const s = Math.min(RAPID * dt / dist, 1); tx += dx * s; ty += dy * s; }
+        }
+      }
+
+      /* ── PASS 2: semi-finish raster near letters (tool R2) ──────────── */
+      else if (phase === 'rough2') {
+        if (pathIdx >= rasterPath2.length) {
+          phase = finOuterPath.length > 0 ? 'fin_rapid' : 'retract';
+          pathIdx = 0; curR = R4;
+          if (phase === 'retract') animDone = true;
+        } else {
+          let budget = FEED_SF * dt;
+          while (budget > 0 && pathIdx < rasterPath2.length) {
+            const pt   = rasterPath2[pathIdx];
+            const isGap = !!pt.isGap;
+            const spd  = isGap ? RAPID : FEED_SF;
+            const dx   = pt.x - tx, dy = pt.y - ty;
+            const dist = Math.hypot(dx, dy);
+            lifted = isGap; cutting = !isGap;
+            if (dist <= 1.5) {
+              if (!isGap) {
+                cut(pt.x, pt.y, tx, ty, R2 * 2.2);
+                if (Math.random() < 0.28) emitChip(pt.x, pt.y, dx >= 0 ? 1 : -1);
+                if (Math.random() < 0.18) emitNeedle(pt.x, pt.y, dx >= 0 ? 1 : -1);
+              }
+              tx = pt.x; ty = pt.y; pathIdx++;
+              budget -= isGap ? dist * (FEED_SF / RAPID) : dist;
+            } else {
+              const s = Math.min(spd * dt / dist, 1);
+              const nx = tx + dx * s, ny = ty + dy * s;
+              if (!isGap) {
+                cut(nx, ny, tx, ty, R2 * 2.2);
+                if (Math.random() < 0.28) emitChip(nx, ny, dx >= 0 ? 1 : -1);
+                if (Math.random() < 0.18) emitNeedle(nx, ny, dx >= 0 ? 1 : -1);
+              }
+              tx = nx; ty = ny; budget = 0;
+            }
+          }
+          if (pathIdx >= rasterPath2.length) {
+            phase = finOuterPath.length > 0 ? 'fin_rapid' : 'retract';
+            pathIdx = 0; curR = R4;
+            if (phase === 'retract') animDone = true;
+          }
+        }
+      }
+
+      /* ── RAPID TO OUTER FINISHING ────────────────────────────────────── */
+      else if (phase === 'fin_rapid') {
+        lifted = true; cutting = false;
+        lastCutX = -1; lastCutY = -1;
+        if (!finOuterPath.length) {
+          phase = ctrPath.length > 0 ? 'ctr_rapid' : 'retract';
+          pathIdx = 0; if (phase === 'retract') animDone = true;
+        } else {
+          const dest = finOuterPath[0];
+          const dx = dest.x - tx, dy = dest.y - ty;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 3) { tx = dest.x; ty = dest.y; phase = 'finishing'; pathIdx = 0; }
+          else { const s = Math.min(RAPID * dt / dist, 1); tx += dx * s; ty += dy * s; }
+        }
+      }
+
+      /* ── OUTER FINISHING: trace letter contours (tool R4) ────────────── */
+      else if (phase === 'finishing') {
+        if (pathIdx >= finOuterPath.length) {
+          phase = ctrPath.length > 0 ? 'ctr_rapid' : 'retract';
+          pathIdx = 0; lastCutX = -1; lastCutY = -1;
+          if (phase === 'retract') animDone = true;
+        } else {
+          let budget = FEED_F * dt;
+          while (budget > 0 && pathIdx < finOuterPath.length) {
+            const pt   = finOuterPath[pathIdx];
+            const isGap = !!pt.isGap;
+            const spd  = isGap ? RAPID : FEED_F;
+            const dx   = pt.x - tx, dy = pt.y - ty;
+            const dist = Math.hypot(dx, dy);
+            lifted = isGap; cutting = !isGap;
+            if (dist <= 1.5) {
+              if (!isGap) {
+                cut(pt.x, pt.y, tx, ty, R4 * 2.2);
+                lastCutX = pt.x; lastCutY = pt.y;
+                if (Math.random() < 0.10) emitChip(pt.x, pt.y, dx >= 0 ? 1 : -1);
+                if (Math.random() < 0.18) emitNeedle(pt.x, pt.y, dx >= 0 ? 1 : -1);
+              } else { lastCutX = -1; lastCutY = -1; }
+              tx = pt.x; ty = pt.y; pathIdx++;
+              budget -= isGap ? dist * (FEED_F / RAPID) : dist;
+            } else {
+              const s = Math.min(spd * dt / dist, 1);
+              const nx = tx + dx * s, ny = ty + dy * s;
+              if (!isGap) {
+                cut(nx, ny, tx, ty, R4 * 2.2);
+                lastCutX = nx; lastCutY = ny;
+                if (Math.random() < 0.10) emitChip(nx, ny, dx >= 0 ? 1 : -1);
+                if (Math.random() < 0.18) emitNeedle(nx, ny, dx >= 0 ? 1 : -1);
+              } else { lastCutX = -1; lastCutY = -1; }
+              tx = nx; ty = ny; budget = 0;
+            }
+          }
+          if (pathIdx >= finOuterPath.length) {
+            phase = ctrPath.length > 0 ? 'ctr_rapid' : 'retract';
+            pathIdx = 0; lastCutX = -1; lastCutY = -1;
+            if (phase === 'retract') animDone = true;
+          }
+        }
+      }
+
+      /* ── RAPID TO COUNTER PASSES ─────────────────────────────────────── */
+      else if (phase === 'ctr_rapid') {
+        lifted = true; cutting = false;
+        lastCutX = -1; lastCutY = -1;
+        if (!ctrPath.length) { animDone = true; phase = 'settle'; settleT = 0; }
+        else {
+          const dest = ctrPath[0];
+          const dx = dest.x - tx, dy = dest.y - ty;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 3) { tx = dest.x; ty = dest.y; phase = 'counters'; pathIdx = 0; }
+          else { const s = Math.min(RAPID * dt / dist, 1); tx += dx * s; ty += dy * s; }
+        }
+      }
+
+      /* ── COUNTER FINISHING: trace inner letter voids (tool R4) ───────── */
+      else if (phase === 'counters') {
+        if (pathIdx >= ctrPath.length) {
+          animDone = true; phase = 'settle'; settleT = 0;
+        } else {
+          let budget = FEED_F * dt;
+          while (budget > 0 && pathIdx < ctrPath.length) {
+            const pt   = ctrPath[pathIdx];
+            const isGap = !!pt.isGap;
+            const spd  = isGap ? RAPID : FEED_F;
+            const dx   = pt.x - tx, dy = pt.y - ty;
+            const dist = Math.hypot(dx, dy);
+            lifted = isGap; cutting = !isGap;
+            if (dist <= 1.5) {
+              if (!isGap) {
+                cut(pt.x, pt.y, tx, ty, R4 * 2.2);
+                lastCutX = pt.x; lastCutY = pt.y;
+                if (Math.random() < 0.08) emitNeedle(pt.x, pt.y, dx >= 0 ? 1 : -1);
+              } else { lastCutX = -1; lastCutY = -1; }
+              tx = pt.x; ty = pt.y; pathIdx++;
+              budget -= isGap ? dist * (FEED_F / RAPID) : dist;
+            } else {
+              const s = Math.min(spd * dt / dist, 1);
+              const nx = tx + dx * s, ny = ty + dy * s;
+              if (!isGap) {
+                cut(nx, ny, tx, ty, R4 * 2.2);
+                lastCutX = nx; lastCutY = ny;
+                if (Math.random() < 0.08) emitNeedle(nx, ny, dx >= 0 ? 1 : -1);
+              } else { lastCutX = -1; lastCutY = -1; }
+              tx = nx; ty = ny; budget = 0;
+            }
+          }
+          if (pathIdx >= ctrPath.length) { animDone = true; phase = 'settle'; settleT = 0; }
+        }
+      }
+
+      /* ── SETTLE: brief pause so viewer registers the finished nameplate ─ */
+      else if (phase === 'settle') {
+        lifted = true; cutting = false;
+        settleT += dt;
+        if (settleT >= 0.38) phase = 'retract';
+      }
+
+      /* ── RETRACT ─────────────────────────────────────────────────────── */
+      else if (phase === 'retract') {
+        lifted = true;
+        const spd = RAPID * 1.4 * dt;
+        tx += spd * 0.65;
+        ty -= spd * 0.75;
+        if (ty < -R * 5) phase = 'done';
+      }
+
+      /* ── DONE ────────────────────────────────────────────────────────── */
+      else if (phase === 'done') {
+        animDone = true;
+        composite();
+        tickChips();
+        if (chips.length === 0) { finalise(); return; }
+        requestAnimationFrame(frame);
+        return;
+      }
+
+      composite();
+      tickChips();
+      if (phase !== 'done') drawMill(fCtx, tx, ty, curR, spinA, cutting, lifted);
+      requestAnimationFrame(frame);
+    }
+
+    setTimeout(() => requestAnimationFrame(frame), 380);
+  }
+
+  /* ── Pre-render: bright brushed brass ──────────────────────────────────── */
+  function renderBrass(ctx: CanvasRenderingContext2D, W: number, H: number) {
+    ctx.fillStyle = '#b08830';
+    ctx.fillRect(0, 0, W, H);
+    // Anisotropic horizontal grain
+    for (let y = 0; y < H; y += 0.55) {
+      const r = Math.random();
+      if (r > 0.54) {
+        ctx.strokeStyle = `rgba(255,228,112,${((r - 0.54) * 0.26).toFixed(3)})`;
+        ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      } else if (r < 0.14) {
+        ctx.strokeStyle = `rgba(44,24,0,${((0.14 - r) * 0.22).toFixed(3)})`;
+        ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+    }
+    // Very faint static base specular — the dynamic one in composite() does the heavy lifting
+    const sp = ctx.createLinearGradient(W * 0.1, 0, W * 0.9, H);
+    sp.addColorStop(0,    'rgba(255,244,158,0)');
+    sp.addColorStop(0.38, 'rgba(255,244,158,0.05)');
+    sp.addColorStop(0.52, 'rgba(255,244,158,0.10)');
+    sp.addColorStop(0.66, 'rgba(255,244,158,0.04)');
+    sp.addColorStop(1,    'rgba(255,244,158,0)');
+    ctx.fillStyle = sp; ctx.fillRect(0, 0, W, H);
+    // Edge vignette
+    const vig = ctx.createRadialGradient(W/2, H/2, H * 0.05, W/2, H/2, Math.max(W,H) * 0.88);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.30)');
+    ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ── Pre-render: machined brass pocket texture ──────────────────────────── */
+  function renderField(ctx: CanvasRenderingContext2D, W: number, H: number, step: number) {
+    // Freshly cut brass is still yellow-gold — matte/dimmer than the polished top
+    ctx.fillStyle = '#8a6914';
+    ctx.fillRect(0, 0, W, H);
+    // Raster scallop toolmarks — per-row amplitude + phase jitter (real CNC isn't perfectly regular)
+    const rowPitch = step * 0.52;
+    for (let y = -rowPitch; y < H + rowPitch; y += rowPitch) {
+      const amp   = step * 0.07 * (0.88 + Math.random() * 0.24);  // amplitude variation
+      const phase = (Math.random() - 0.5) * 0.30;                  // subtle phase offset
+      ctx.beginPath(); ctx.moveTo(0, y);
+      for (let x = 0; x <= W; x += 3) {
+        ctx.lineTo(x, y + Math.sin((x / step) * Math.PI * 2 + phase) * amp);
+      }
+      const even = Math.round(y / rowPitch) % 2 === 0;
+      ctx.strokeStyle = even ? 'rgba(210,165,45,0.48)' : 'rgba(50,28,0,0.30)';
+      ctx.lineWidth = 0.88; ctx.stroke();
+    }
+    // Subtle secondary grid (cross-feed direction)
+    for (let y = 0; y < H; y += step * 2.1) {
+      ctx.strokeStyle = 'rgba(195,150,28,0.10)';
+      ctx.lineWidth = 0.4;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    // Shallow depth vignette — less dramatic, it's still bright metal
+    const vig = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H) * 0.75);
+    vig.addColorStop(0, 'rgba(0,0,0,0.02)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.24)');
+    ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ── Reduced-motion finish helper ───────────────────────────────────────── */
+  function showDone(stockEl: HTMLCanvasElement, fxEl: HTMLCanvasElement, parent: HTMLElement) {
+    fxEl.style.display = 'none';
+    stockEl.style.zIndex = '1';
+    parent.classList.add('cnc-done');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>

@@ -1,0 +1,501 @@
+---
+// Global plasma-cutter pointer overlay — decorative, never blocks interaction
+---
+<canvas id="plasma-overlay" aria-hidden="true"></canvas>
+
+<style>
+  #plasma-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+  }
+</style>
+
+<script is:inline>
+(function () {
+  'use strict';
+
+  const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('plasma-overlay'));
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ── CONFIGURATION ─────────────────────────────────────────────────────────
+  const CFG = {
+    kerfWidth:      3.5,    // px — kerf line thickness at full heat
+    coolMs:         2200,   // ms — kerf segment visible lifetime
+    arcLen:         40,     // px — plasma column length (torch → cut point)
+    arcWidthPx:     7,      // px — column width at torch end
+    arcAfterMs:     180,    // ms — arc lingers after release
+    flickerFreqs:   [43, 71, 17],
+    flickerAmps:    REDUCED ? [0, 0, 0] : [0.11, 0.075, 0.05],
+    sparkDensity:   REDUCED ? 0 : 9,     // sparks emitted per frame while held
+    sparkFanDeg:    62,     // half-angle of directional spark fan
+    sparkMinSpd:    7,
+    sparkMaxSpd:    23,
+    sparkGravity:   0.42,
+    sparkBounce:    0.28,
+    sparkLifeMs:    560,
+    maxSparks:      420,
+    blowbackN:      REDUCED ? 0 : 22,   // pierce blowback count
+    blowbackSpd:    14,
+    kerfMinDist:    2.5,    // px — minimum cursor travel before new kerf point
+    maxKerf:        1000,
+    fumeEnabled:    !REDUCED,
+    maxFume:        55,
+    pierceFlashMs:  240,    // ms — duration of pierce flash
+  };
+
+  // Plasma column color stops: position → [r, g, b, a] (torch end → cut end)
+  const ARC_STOPS = [
+    [0.00, [148, 72,  255, 0.78]],
+    [0.18, [78,  142, 255, 1.00]],
+    [0.50, [188, 226, 255, 1.00]],
+    [0.85, [255, 255, 255, 1.00]],
+    [1.00, [255, 244, 155, 0.80]],
+  ];
+
+  // Kerf temperature ramp: t ∈ [0,1] (hot→cold) → [r, g, b]
+  const TEMP_STOPS = [
+    [0.00, [255, 255, 225]],
+    [0.12, [255, 238,  98]],
+    [0.30, [255, 114,  16]],
+    [0.56, [198,  20,   0]],
+    [0.80, [ 76,   4,   0]],
+    [1.00, [  3,   0,   0]],
+  ];
+
+  // ── STATE ──────────────────────────────────────────────────────────────────
+  let held = false;
+  let cx = 0, cy = 0;
+  let pvx = 0, pvy = 0;       // smoothed cursor velocity (px/frame)
+  let lastKx = -1e9, lastKy = -1e9;
+  let releaseT = 0;
+  let pierceT = 0, pierceX = 0, pierceY = 0;
+
+  let kerf   = [];             // { x, y, born: number }
+  let sparks = [];             // { x, y, vx, vy, born, life, hot, r, trailLen }
+  let fumes  = [];             // { x, y, vx, vy, born, life, r }
+
+  let rafId  = null;
+
+  // ── CANVAS RESIZE ─────────────────────────────────────────────────────────
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize, { passive: true });
+
+  // ── POINTER EVENTS ────────────────────────────────────────────────────────
+  window.addEventListener('pointerdown', function (e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    cx = e.clientX; cy = e.clientY;
+    pvx = 0; pvy = 0;
+    held = true;
+    lastKx = cx; lastKy = cy;
+    const now = performance.now();
+    pushKerf(cx, cy, now);
+    spawnBlowback(cx, cy, now);
+    if (!REDUCED) { pierceT = now; pierceX = cx; pierceY = cy; }
+    ensureLoop();
+  }, { passive: true });
+
+  window.addEventListener('pointermove', function (e) {
+    if (!held) return;
+    const dx = e.clientX - cx, dy = e.clientY - cy;
+    pvx = pvx * 0.55 + dx * 0.45;
+    pvy = pvy * 0.55 + dy * 0.45;
+    cx = e.clientX; cy = e.clientY;
+    if (Math.hypot(cx - lastKx, cy - lastKy) >= CFG.kerfMinDist) {
+      pushKerf(cx, cy, performance.now());
+      lastKx = cx; lastKy = cy;
+    }
+  }, { passive: true });
+
+  function onRelease() {
+    if (!held) return;
+    held = false;
+    releaseT = performance.now();
+  }
+  window.addEventListener('pointerup',     onRelease, { passive: true });
+  window.addEventListener('pointercancel', onRelease, { passive: true });
+  document.addEventListener('pointerleave', function (e) {
+    if (e.target === document.documentElement) onRelease();
+  }, { passive: true });
+
+  // ── HELPERS ───────────────────────────────────────────────────────────────
+  function pushKerf(x, y, t) {
+    kerf.push({ x, y, born: t });
+    if (kerf.length > CFG.maxKerf) kerf.shift();
+  }
+
+  function ensureLoop() {
+    if (rafId === null) rafId = requestAnimationFrame(tick);
+  }
+
+  // Multi-frequency flicker — gentle luminance variation, never strobing
+  function flicker(now) {
+    let v = 0;
+    for (let i = 0; i < CFG.flickerFreqs.length; i++)
+      v += Math.sin(now * 0.001 * CFG.flickerFreqs[i]) * CFG.flickerAmps[i];
+    return 1 + v;
+  }
+
+  // Interpolate the kerf temperature palette
+  function tempRGB(t) {
+    for (let i = 0; i < TEMP_STOPS.length - 1; i++) {
+      if (t <= TEMP_STOPS[i + 1][0]) {
+        const f  = (t - TEMP_STOPS[i][0]) / (TEMP_STOPS[i + 1][0] - TEMP_STOPS[i][0]);
+        const a  = TEMP_STOPS[i][1], b = TEMP_STOPS[i + 1][1];
+        return [
+          Math.round(a[0] + (b[0] - a[0]) * f),
+          Math.round(a[1] + (b[1] - a[1]) * f),
+          Math.round(a[2] + (b[2] - a[2]) * f),
+        ];
+      }
+    }
+    return [3, 0, 0];
+  }
+
+  // Shortest-path angle interpolation
+  function lerpAngle(a, b, t) {
+    const d = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    return a + d * t;
+  }
+
+  // ── SPAWN ─────────────────────────────────────────────────────────────────
+  // Pierce blowback: molten spatter kicked upward toward the operator
+  function spawnBlowback(x, y, now) {
+    if (!CFG.blowbackN) return;
+    for (let i = 0; i < CFG.blowbackN; i++) {
+      const ang = -Math.PI / 2 + (Math.random() - 0.5) * (Math.PI * 0.62);
+      const spd = CFG.blowbackSpd * (0.5 + Math.random());
+      sparks.push({
+        x, y,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd,
+        born: now,
+        life: 820 + Math.random() * 340,
+        hot: true,
+        r: 1.1 + Math.random() * 1.4,
+        trailLen: 9 + Math.random() * 10,
+      });
+    }
+  }
+
+  // Continuous cutting sparks: fan opposite-to-movement, biased downward
+  function spawnSparks(now) {
+    if (sparks.length >= CFG.maxSparks) return;
+    const n = Math.min(CFG.sparkDensity, CFG.maxSparks - sparks.length);
+
+    let baseAngle = Math.PI / 2;  // default: straight down
+    const spd = Math.hypot(pvx, pvy);
+    if (spd > 1.5) {
+      const moveAngle = Math.atan2(pvy, pvx);
+      // Sparks scatter opposite to movement, blended 65% back + 35% gravity
+      baseAngle = lerpAngle(moveAngle + Math.PI, Math.PI / 2, 0.35);
+    }
+
+    const fanRad = CFG.sparkFanDeg * Math.PI / 180;
+    for (let i = 0; i < n; i++) {
+      const ang = baseAngle + (Math.random() - 0.5) * 2 * fanRad;
+      const s   = CFG.sparkMinSpd + Math.random() * (CFG.sparkMaxSpd - CFG.sparkMinSpd);
+      sparks.push({
+        x: cx + (Math.random() - 0.5) * 3,
+        y: cy + (Math.random() - 0.5) * 3,
+        vx: Math.cos(ang) * s,
+        vy: Math.sin(ang) * s,
+        born: now,
+        life: CFG.sparkLifeMs * (0.48 + Math.random()),
+        hot: Math.random() < 0.65,
+        r: 0.7 + Math.random() * 1.2,
+        trailLen: 4 + Math.random() * 11,
+      });
+    }
+  }
+
+  function spawnFume(now) {
+    if (fumes.length >= CFG.maxFume) return;
+    fumes.push({
+      x: cx + (Math.random() - 0.5) * 6,
+      y: cy - 2,
+      vx: (Math.random() - 0.5) * 0.45,
+      vy: -0.65 - Math.random() * 0.55,
+      born: now,
+      life: 1050 + Math.random() * 700,
+      r: 3 + Math.random() * 5,
+    });
+  }
+
+  // ── UPDATE ────────────────────────────────────────────────────────────────
+  function update(now) {
+    // Expire pierce flash in update so idle check works correctly
+    if (pierceT > 0 && now - pierceT >= CFG.pierceFlashMs) pierceT = 0;
+
+    if (held) {
+      spawnSparks(now);
+      if (CFG.fumeEnabled && Math.random() < 0.35) spawnFume(now);
+    }
+
+    // Spark physics
+    for (const s of sparks) {
+      s.x += s.vx; s.y += s.vy;
+      s.vy += CFG.sparkGravity;
+      // Floor bounce
+      if (s.y > canvas.height - 1) {
+        s.y = canvas.height - 1;
+        s.vy *= -CFG.sparkBounce;
+        s.vx *= 0.80;
+      }
+      // Side walls — just damp
+      if (s.x < 0 || s.x > canvas.width) s.vx *= -0.55;
+    }
+
+    // Fume drift upward with gentle turbulence
+    for (const f of fumes) {
+      f.x += f.vx; f.y += f.vy;
+      f.vx += (Math.random() - 0.5) * 0.07;
+      f.vy -= 0.025;
+    }
+
+    // Prune expired particles — kerf outlives sparks so it drives the loop end
+    kerf   = kerf.filter(p => now - p.born < CFG.coolMs + 300);
+    sparks = sparks.filter(s => now - s.born < s.life);
+    fumes  = fumes.filter(f => now - f.born < f.life);
+  }
+
+  // ── DRAW ──────────────────────────────────────────────────────────────────
+  function draw(now) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawKerf(now);
+    if (CFG.fumeEnabled) drawFume(now);
+    drawSparks(now);
+
+    const arcT = held ? 1 : Math.max(0, 1 - (now - releaseT) / CFG.arcAfterMs);
+    if (arcT > 0.002) drawArc(now, arcT * flicker(now));
+  }
+
+  // ── DRAW: KERF ────────────────────────────────────────────────────────────
+  function drawKerf(now) {
+    if (kerf.length === 0) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (kerf.length === 1) {
+      // Single pierce point — glowing dot pools at the entry
+      const p = kerf[0];
+      const t = Math.min(1, (now - p.born) / CFG.coolMs);
+      if (t < 1) {
+        const [r, g, b] = tempRGB(t);
+        const al = 1 - Math.pow(t, 1.8);
+        ctx.globalCompositeOperation = 'lighter';
+        const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, CFG.kerfWidth * 4);
+        grd.addColorStop(0, `rgba(${r},${g},${b},${al * 0.72})`);
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(p.x, p.y, CFG.kerfWidth * 4, 0, Math.PI * 2); ctx.fill();
+      }
+    } else {
+      for (let i = 1; i < kerf.length; i++) {
+        const p0 = kerf[i - 1], p1 = kerf[i];
+        const age = now - (p0.born + p1.born) * 0.5;
+        const t   = Math.min(1, Math.max(0, age / CFG.coolMs));
+        if (t >= 1) continue;
+
+        const [r, g, b] = tempRGB(t);
+        const al = 1 - Math.pow(t, 1.65);
+        const kw = CFG.kerfWidth * Math.max(0.26, 1 - t * 0.64);
+
+        ctx.globalCompositeOperation = 'lighter';
+
+        // Outer heat glow
+        ctx.globalAlpha = al * 0.28;
+        ctx.strokeStyle = `rgb(${r},${Math.min(255, g + 18)},0)`;
+        ctx.lineWidth   = kw * 4.8;
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+
+        // Inner molten core
+        ctx.globalAlpha = al * 0.90;
+        ctx.strokeStyle = `rgb(${r},${g},${b})`;
+        ctx.lineWidth   = kw;
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  // ── DRAW: SPARKS ──────────────────────────────────────────────────────────
+  function drawSparks(now) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+
+    for (const s of sparks) {
+      const age = now - s.born;
+      const t   = age / s.life;
+      const al  = Math.pow(1 - t, 1.35);
+
+      // Trail tail: back-trace along velocity
+      const spd  = Math.hypot(s.vx, s.vy) || 1;
+      const tf   = s.trailLen / spd;
+      const tx   = s.x - s.vx * tf;
+      const ty   = s.y - s.vy * tf;
+
+      const [r, g, b] = s.hot
+        ? [255, Math.round(195 + 60 * (1 - t)), Math.round(55 * (1 - t))]
+        : [255, Math.round(85 * (1 - t)), 0];
+
+      // Glowing trail
+      ctx.globalAlpha = al * 0.88;
+      ctx.strokeStyle = `rgb(${r},${g},${b})`;
+      ctx.lineWidth   = s.r * Math.max(0.22, 1 - t * 0.58);
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(s.x, s.y); ctx.stroke();
+
+      // Bright tip
+      ctx.globalAlpha = al * 0.78;
+      ctx.fillStyle   = s.hot ? '#ffffc0' : '#ffaa00';
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 0.65, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ── DRAW: FUME ────────────────────────────────────────────────────────────
+  function drawFume(now) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    for (const f of fumes) {
+      const t    = (now - f.born) / f.life;
+      const ramp = t < 0.12 ? t / 0.12 : 1;
+      const al   = Math.max(0, 0.065 * ramp * (1 - t));
+      ctx.globalAlpha = al;
+      ctx.fillStyle   = '#6a5e5e';
+      const r = f.r * (1 + t * 2.3);
+      ctx.beginPath(); ctx.arc(f.x, f.y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ── DRAW: ARC JET ─────────────────────────────────────────────────────────
+  // Model: cursor = cut point (material surface).
+  // Torch nozzle floats above/behind cursor; plasma column points from nozzle → cut point.
+  function drawArc(now, intensity) {
+    // Arc direction: mostly downward (+Y), leans slightly into drag direction
+    const spd = Math.hypot(pvx, pvy);
+    let dx = 0, dy = 1;
+    if (spd > 1.5) {
+      dx = (pvx / spd) * 0.22;
+      dy = (pvy / spd) * 0.22 + 0.975;
+      const len = Math.hypot(dx, dy);
+      dx /= len; dy /= len;
+    }
+
+    // Torch nozzle position (above/behind cursor along arc direction)
+    const torchX = cx - dx * CFG.arcLen;
+    const torchY = cy - dy * CFG.arcLen;
+
+    // Perpendicular to arc axis (for column width)
+    const perpX = -dy, perpY = dx;
+    const hw = CFG.arcWidthPx / 2;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // ── Violet torch-nozzle bloom ──────────────────────────────────────────
+    const bloom = ctx.createRadialGradient(torchX, torchY, 0, torchX, torchY, 24);
+    bloom.addColorStop(0,   `rgba(150,78,255,${0.52 * intensity})`);
+    bloom.addColorStop(0.6, `rgba(62,30,185,${0.18 * intensity})`);
+    bloom.addColorStop(1,   'rgba(0,0,65,0)');
+    ctx.fillStyle = bloom;
+    ctx.beginPath(); ctx.arc(torchX, torchY, 24, 0, Math.PI * 2); ctx.fill();
+
+    // ── Outer plasma column (tapered quad: wide at torch → point at cut) ──
+    const colGrad = ctx.createLinearGradient(torchX, torchY, cx, cy);
+    for (const [pos, [r, g, b, a]] of ARC_STOPS) {
+      colGrad.addColorStop(pos, `rgba(${r},${g},${b},${a * intensity})`);
+    }
+    ctx.fillStyle = colGrad;
+    ctx.beginPath();
+    ctx.moveTo(torchX + perpX * hw,  torchY + perpY * hw);
+    ctx.lineTo(torchX - perpX * hw,  torchY - perpY * hw);
+    ctx.lineTo(cx     - perpX * 0.4, cy     - perpY * 0.4);
+    ctx.lineTo(cx     + perpX * 0.4, cy     + perpY * 0.4);
+    ctx.closePath();
+    ctx.fill();
+
+    // ── Inner constricted core (brighter, narrower) ───────────────────────
+    const chw = hw * 0.40;
+    const coreGrad = ctx.createLinearGradient(torchX, torchY, cx, cy);
+    coreGrad.addColorStop(0,   `rgba(215,185,255,${0.56 * intensity})`);
+    coreGrad.addColorStop(0.4, `rgba(255,255,255,${0.93 * intensity})`);
+    coreGrad.addColorStop(1,   `rgba(255,255,255,${intensity})`);
+    ctx.fillStyle = coreGrad;
+    ctx.beginPath();
+    ctx.moveTo(torchX + perpX * chw,  torchY + perpY * chw);
+    ctx.lineTo(torchX - perpX * chw,  torchY - perpY * chw);
+    ctx.lineTo(cx     - perpX * 0.15, cy     - perpY * 0.15);
+    ctx.lineTo(cx     + perpX * 0.15, cy     + perpY * 0.15);
+    ctx.closePath();
+    ctx.fill();
+
+    // ── White-hot cut-point glow ───────────────────────────────────────────
+    const cutGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 13);
+    cutGlow.addColorStop(0,   `rgba(255,255,225,${intensity})`);
+    cutGlow.addColorStop(0.4, `rgba(255,178,55,${0.56 * intensity})`);
+    cutGlow.addColorStop(1,   'rgba(255,65,0,0)');
+    ctx.fillStyle = cutGlow;
+    ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.fill();
+
+    // ── Localized ambient cast (small; never strobes the screen) ──────────
+    const ambient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 54);
+    ambient.addColorStop(0, `rgba(92,145,255,${0.033 * intensity})`);
+    ambient.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ambient;
+    ctx.beginPath(); ctx.arc(cx, cy, 54, 0, Math.PI * 2); ctx.fill();
+
+    // ── Pierce blowback flash (brief radial pulse on initial press) ────────
+    if (pierceT > 0) {
+      const el = now - pierceT;
+      if (el < CFG.pierceFlashMs) {
+        const pt  = el / CFG.pierceFlashMs;
+        const pa  = Math.max(0, (1 - pt) * 0.68);
+        const pr  = 12 + pt * 40;
+        const fsh = ctx.createRadialGradient(pierceX, pierceY, 0, pierceX, pierceY, pr);
+        fsh.addColorStop(0,    `rgba(255,255,235,${pa})`);
+        fsh.addColorStop(0.30, `rgba(255,162,42,${pa * 0.55})`);
+        fsh.addColorStop(1,    'rgba(255,65,0,0)');
+        ctx.fillStyle = fsh;
+        ctx.beginPath(); ctx.arc(pierceX, pierceY, pr, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // ── ANIMATION LOOP ────────────────────────────────────────────────────────
+  function tick(now) {
+    update(now);
+    draw(now);
+
+    const idle = !held
+      && kerf.length   === 0
+      && sparks.length === 0
+      && fumes.length  === 0
+      && pierceT       === 0;
+
+    if (idle) {
+      rafId = null;
+      return;
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+})();
+</script>

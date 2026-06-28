@@ -1,0 +1,523 @@
+---
+import Layout      from '@/layouts/Layout.astro';
+import Lattice     from '@/components/Lattice.astro';
+import Bolt        from '@/components/Bolt.astro';
+import AnodizeText from '@/components/AnodizeText.astro';
+
+const processes = [
+  {
+    name:    'CNC Mill',
+    page:    'Home',
+    color:   '#d4a044',
+    desc:    'The home nameplate is milled from virtual brass stock — a raster-scan toolhead rips across, dropping copper chips and leaving the text machined into metal.',
+  },
+  {
+    name:    'SLS Sinter',
+    page:    'About',
+    color:   '#b0a0a0',
+    desc:    'PA-12 nylon powder bed receives a laser contour pass then rotating-angle hatch fill, layer by layer. A recoater blade sweeps, then an air-jet clears to reveal the sintered letters.',
+  },
+  {
+    name:    'SLA Resin',
+    page:    'Research',
+    color:   '#9060e0',
+    desc:    'An amber resin vat is cured by a violet UV laser — contour trace, then crosshatch fill. A wiper blade sweeps between layers. Gravity drain pulls the resin down, leaving the letters behind.',
+  },
+  {
+    name:    'FDM Print',
+    page:    'Equipment',
+    color:   '#c07030',
+    desc:    'A full toolhead — PTFE tube, carriage, brass heater block, fan duct — deposits a slow perimeter bead, then accelerates through speed-ramped rectilinear infill at up to 8× speed.',
+  },
+  {
+    name:    'PCB Etch',
+    page:    'Contact',
+    color:   '#40c860',
+    desc:    'An FR4 board receives 45°/90° autorouter trace routing, copper flood pour, plated via punch-ins, a soldermask left-to-right sweep, then silkscreen outline + ENIG pads + LED glow.',
+  },
+  {
+    name:    'Anodize',
+    page:    'Website',
+    color:   '#c07030',
+    desc:    'Bare brushed-aluminium letters are immersed — electrolysis bubbles rise, a wavy dye front floods left-to-right absorbing into the metal, and a satin iridescent finish settles.',
+  },
+];
+
+const stack = [
+  { name: 'Astro 4',              role: 'Static-site framework — zero JS by default, Markdown content collections for blog posts' },
+  { name: 'TypeScript',           role: 'All component logic and animation state machines — fully typed throughout' },
+  { name: 'Canvas 2D API',        role: 'All six manufacturing animations — no WebGL, no animation libraries, raw draw calls' },
+  { name: 'Scoped CSS',           role: 'Per-component styles in <style> blocks — no Tailwind, no design-system framework' },
+  { name: 'IntersectionObserver', role: 'Scroll-triggered animation with threshold 0.12 and -20px bottom rootMargin' },
+  { name: 'Range API',            role: 'Pixel-precise glyph mask from live DOM text — letter shapes match the actual rendered font' },
+  { name: 'Concurrency limiter',  role: 'At most 2 animations active simultaneously — deferred with setTimeout(300ms) if at limit' },
+];
+
+const tokens = [
+  { token: '--graphite',   hex: '#0b0c0e', role: 'Page background' },
+  { token: '--panel',      hex: '#15171b', role: 'Card / raised surfaces' },
+  { token: '--panel-edge', hex: '#23262c', role: 'Borders' },
+  { token: '--copper',     hex: '#c1773f', role: 'Primary accent, focus rings' },
+  { token: '--gold',       hex: '#d6ae72', role: 'Highlights, engraved text' },
+  { token: '--steel',      hex: '#7c848b', role: 'Secondary text, labels' },
+  { token: '--text',       hex: '#eceae4', role: 'Body copy' },
+];
+---
+
+<Layout
+  title="Website — Benjamin Davis"
+  description="How this site was designed and built — the metal card as design blueprint, six manufacturing animations in Canvas 2D, and the Astro + TypeScript stack."
+>
+
+  <!-- ── Hero ────────────────────────────────────────────────────────────── -->
+  <section class="ws-hero">
+    <Lattice />
+    <Bolt position="tl" />
+    <Bolt position="tr" />
+    <Bolt position="bl" />
+    <Bolt position="br" />
+    <div class="container ws-hero-body">
+      <p class="overline">Meta</p>
+      <AnodizeText id="ws-hero" duration={2.8} delay={0.4} color="accent">
+        <h1 class="ws-heading">Built to match<br/><span class="gold">the card.</span></h1>
+      </AnodizeText>
+      <p class="ws-sub">This site is the digital twin of the physical metal business card — same materials, same precision, same process vocabulary.</p>
+    </div>
+  </section>
+
+  <!-- ── Origin ──────────────────────────────────────────────────────────── -->
+  <section class="ws-section">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-over">01</p>
+        <AnodizeText id="ws-sec-01" duration={2.2} trigger="scroll" delay={0.05} color="accent">
+          <h2 class="section-title">The Card as Blueprint</h2>
+        </AnodizeText>
+      </div>
+      <div class="origin-grid">
+        <div class="origin-text">
+          <p>The physical card — precision-machined from 6061 aluminium, type-II black anodised, laser-engraved with gold fill, copper QR inlay press-fit — dictated every design decision on this site.</p>
+          <p>The black anodised surface became <code>--graphite</code>. The laser-engraved gold text became <code>--gold</code>. The copper QR inlay became <code>--copper</code>. The recessed bolt pattern in the card's corners became the <code>&lt;Bolt /&gt;</code> component. The structural strut lattice machined into the card face became the <code>&lt;Lattice /&gt;</code> background animation.</p>
+          <p>No colour, component, or animation was added without asking: <em>could this have been milled, sintered, etched, or anodised?</em></p>
+        </div>
+        <div class="origin-spec">
+          <p class="spec-label">Card material specification</p>
+          <table class="spec-table">
+            <tr><th>Material</th><td>6061-T6 Aluminium</td></tr>
+            <tr><th>Finish</th><td>Type-II black anodise</td></tr>
+            <tr><th>Text</th><td>Laser-engraved, gold-fill</td></tr>
+            <tr><th>QR inlay</th><td>Copper, press-fit</td></tr>
+            <tr><th>Corner bolts</th><td>M2 Phillips pan-head</td></tr>
+            <tr><th>Size</th><td>85.6 × 54.0 × 2.0 mm</td></tr>
+            <tr><th>NFC chip</th><td>Embedded (links to this site)</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Manufacturing animations ─────────────────────────────────────────── -->
+  <section class="ws-section ws-section--dark">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-over">02</p>
+        <AnodizeText id="ws-sec-02" duration={2.2} trigger="scroll" delay={0.05} color="accent">
+          <h2 class="section-title">Manufacturing Animations</h2>
+        </AnodizeText>
+      </div>
+      <p class="section-intro">Each major heading on this site triggers a process-authentic manufacturing animation when it scrolls into view. All six are built with the Canvas 2D API — no WebGL, no libraries — using the Range API to extract pixel-accurate letter masks from the live DOM.</p>
+      <div class="process-grid">
+        {processes.map(p => (
+          <div class="process-card">
+            <div class="process-dot" style={`background:${p.color}`}></div>
+            <div class="process-body">
+              <p class="process-name">{p.name}</p>
+              <p class="process-page">{p.page}</p>
+              <p class="process-desc">{p.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Stack & approach ─────────────────────────────────────────────────── -->
+  <section class="ws-section">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-over">03</p>
+        <AnodizeText id="ws-sec-03" duration={2.0} trigger="scroll" delay={0.05} color="accent">
+          <h2 class="section-title">Stack &amp; Approach</h2>
+        </AnodizeText>
+      </div>
+      <ul class="stack-list">
+        {stack.map(s => (
+          <li class="stack-item">
+            <span class="stack-name">{s.name}</span>
+            <span class="stack-role">{s.role}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <!-- ── Commission ──────────────────────────────────────────────────────── -->
+  <section class="ws-section ws-commission">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-over">05</p>
+        <AnodizeText id="ws-sec-05" duration={2.0} trigger="scroll" delay={0.05} color="accent">
+          <h2 class="section-title">Order a Card</h2>
+        </AnodizeText>
+      </div>
+      <div class="commission-body">
+        <div class="commission-text">
+          <p>Interested in a precision-machined metal business card of your own? I design and produce bespoke cards — same materials, same tolerances, same process — tailored to your specifications.</p>
+          <p>Each card is machined from 6061-T6 aluminium, type-II anodised, laser-engraved with metallic fill, and finished with a custom inlay. Lead time and pricing depend on quantity and complexity.</p>
+          <a href="/contact" class="commission-cta">Get in touch &rarr;</a>
+        </div>
+        <div class="commission-spec">
+          <p class="spec-label">What's configurable</p>
+          <table class="spec-table">
+            <tr><th>Material</th><td>6061-T6 Aluminium (standard) or custom alloy</td></tr>
+            <tr><th>Anodise colour</th><td>Black, clear, colour — type II or hard-coat III</td></tr>
+            <tr><th>Engraving fill</th><td>Gold, copper, silver, or custom pigment</td></tr>
+            <tr><th>Inlay</th><td>QR code, logo, or decorative — copper or brass press-fit</td></tr>
+            <tr><th>NFC chip</th><td>Optional embedded chip (links to any URL)</td></tr>
+            <tr><th>Size</th><td>Standard ISO CR80 (85.6 × 54 mm) or custom</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Design system ────────────────────────────────────────────────────── -->
+  <section class="ws-section ws-section--dark">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-over">04</p>
+        <AnodizeText id="ws-sec-04" duration={2.0} trigger="scroll" delay={0.05} color="accent">
+          <h2 class="section-title">Design System</h2>
+        </AnodizeText>
+      </div>
+      <p class="section-intro">Seven CSS custom properties, all derived from the physical card. No other colours exist anywhere on this site.</p>
+      <div class="token-grid">
+        {tokens.map(t => (
+          <div class="token-row">
+            <div class="token-swatch" style={`background:${t.hex}`}></div>
+            <code class="token-name">{t.token}</code>
+            <span class="token-hex">{t.hex}</span>
+            <span class="token-role">{t.role}</span>
+          </div>
+        ))}
+      </div>
+      <div class="type-samples">
+        <p class="type-head-sample">Saira Condensed 900 — headings</p>
+        <p class="type-body-sample">IBM Plex Sans 400 — body copy, navigation, cards</p>
+        <p class="type-mono-sample">IBM Plex Mono 400 — labels, specs, overlines</p>
+      </div>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  /* ── Hero ─────────────────────────────────────────────────────────────── */
+  .ws-hero {
+    position: relative;
+    padding-block: 4rem 3rem;
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .ws-hero-body {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; gap: 0.75rem;
+  }
+  .overline {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+  .ws-heading {
+    font-family: var(--font-head);
+    font-size: clamp(2.4rem, 8vw, 4.5rem);
+    font-weight: 900;
+    line-height: 0.93;
+    color: var(--text);
+    margin: 0;
+  }
+  .gold { color: var(--gold); }
+  .ws-sub {
+    font-size: 0.88rem;
+    color: var(--steel);
+    max-width: 480px;
+    line-height: 1.65;
+    margin-top: 0.4rem;
+  }
+
+  /* ── Sections ─────────────────────────────────────────────────────────── */
+  .ws-section {
+    padding-block: 3.5rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .ws-section--dark { background: var(--panel); }
+
+  .section-header {
+    display: flex; align-items: baseline; gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .section-over {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    color: var(--copper);
+    flex-shrink: 0;
+    padding-top: 0.1rem;
+  }
+  .section-title {
+    font-family: var(--font-head);
+    font-size: clamp(1.6rem, 4vw, 2.4rem);
+    font-weight: 900;
+    color: var(--text);
+    margin: 0;
+  }
+  .section-intro {
+    font-size: 0.88rem;
+    color: var(--steel);
+    line-height: 1.65;
+    max-width: 660px;
+    margin-bottom: 2rem;
+  }
+
+  /* ── Origin layout ────────────────────────────────────────────────────── */
+  .origin-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: start;
+  }
+  .origin-text {
+    display: flex; flex-direction: column; gap: 1rem;
+    font-size: 0.88rem; color: var(--steel); line-height: 1.7;
+  }
+  .origin-text p { margin: 0; }
+  .origin-text em { color: var(--text); font-style: italic; }
+  .origin-text code {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--gold);
+    background: color-mix(in srgb, var(--gold-dim) 30%, transparent);
+    padding: 0.1em 0.35em;
+  }
+  .spec-label {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--copper);
+    margin-bottom: 0.75rem;
+  }
+  .spec-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.8rem;
+  }
+  .spec-table th, .spec-table td {
+    text-align: left;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--panel-edge);
+  }
+  .spec-table th {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--steel);
+    background: color-mix(in srgb, var(--panel-edge) 30%, transparent);
+    white-space: nowrap;
+  }
+  .spec-table td { color: var(--text); }
+
+  /* ── Process grid ─────────────────────────────────────────────────────── */
+  .process-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--panel-edge);
+    border: 1px solid var(--panel-edge);
+  }
+  .process-card {
+    background: var(--graphite);
+    padding: 1.4rem 1.25rem;
+    display: flex;
+    gap: 0.9rem;
+    align-items: flex-start;
+  }
+  .ws-section--dark .process-card { background: var(--panel); }
+  .process-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 0.3rem;
+  }
+  .process-body { display: flex; flex-direction: column; gap: 0.25rem; }
+  .process-name {
+    font-family: var(--font-head);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .process-page {
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+  .process-desc {
+    font-size: 0.78rem;
+    color: var(--steel);
+    line-height: 1.6;
+    margin-top: 0.2rem;
+  }
+
+  /* ── Stack list ───────────────────────────────────────────────────────── */
+  .stack-list {
+    list-style: none; padding: 0; margin: 0;
+    display: flex; flex-direction: column;
+    border: 1px solid var(--panel-edge);
+  }
+  .stack-item {
+    display: grid;
+    grid-template-columns: 13rem 1fr;
+    gap: 1.25rem;
+    align-items: start;
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .stack-item:last-child { border-bottom: none; }
+  .stack-name {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: var(--gold);
+    padding-top: 0.05rem;
+  }
+  .stack-role {
+    font-size: 0.82rem;
+    color: var(--steel);
+    line-height: 1.6;
+  }
+
+  /* ── Design tokens ────────────────────────────────────────────────────── */
+  .token-grid {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--panel-edge);
+    margin-bottom: 2.5rem;
+  }
+  .token-row {
+    display: grid;
+    grid-template-columns: 1.4rem 11rem 6rem 1fr;
+    gap: 0.75rem 1rem;
+    align-items: center;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .token-row:last-child { border-bottom: none; }
+  .token-swatch {
+    width: 1rem; height: 1rem;
+    border: 1px solid var(--panel-edge);
+    flex-shrink: 0;
+  }
+  .token-name {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--gold);
+  }
+  .token-hex {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--steel);
+  }
+  .token-role {
+    font-size: 0.78rem;
+    color: var(--steel);
+  }
+
+  /* ── Type samples ─────────────────────────────────────────────────────── */
+  .type-samples {
+    display: flex; flex-direction: column; gap: 0.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--panel-edge);
+  }
+  .type-head-sample {
+    font-family: var(--font-head);
+    font-weight: 900;
+    font-size: 1.25rem;
+    color: var(--text);
+    margin: 0;
+  }
+  .type-body-sample {
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: var(--text);
+    margin: 0;
+  }
+  .type-mono-sample {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--steel);
+    margin: 0;
+  }
+
+  /* ── Commission ──────────────────────────────────────────────────────── */
+  .ws-commission { background: var(--graphite); }
+  .commission-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: start;
+  }
+  .commission-text {
+    display: flex; flex-direction: column; gap: 1rem;
+    font-size: 0.88rem; color: var(--steel); line-height: 1.7;
+  }
+  .commission-text p { margin: 0; }
+  .commission-cta {
+    display: inline-block;
+    margin-top: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--copper);
+    text-decoration: none;
+    border: 1px solid var(--copper);
+    padding: 0.55rem 1rem;
+    transition: background 0.15s, color 0.15s;
+    align-self: flex-start;
+  }
+  .commission-cta:hover {
+    background: var(--copper);
+    color: var(--graphite);
+  }
+  .commission-cta:focus-visible {
+    outline: 2px solid var(--copper);
+    outline-offset: 3px;
+  }
+
+  /* ── Responsive ───────────────────────────────────────────────────────── */
+  @media (max-width: 800px) {
+    .origin-grid { grid-template-columns: 1fr; gap: 2rem; }
+    .commission-body { grid-template-columns: 1fr; gap: 2rem; }
+    .process-grid { grid-template-columns: 1fr 1fr; }
+    .stack-item { grid-template-columns: 1fr; gap: 0.25rem; }
+  }
+  @media (max-width: 540px) {
+    .process-grid { grid-template-columns: 1fr; }
+    .token-row { grid-template-columns: 1.4rem 1fr; }
+    .token-hex { display: none; }
+  }
+</style>

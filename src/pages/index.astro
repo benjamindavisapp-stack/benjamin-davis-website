@@ -1,0 +1,784 @@
+---
+import Layout   from '@/layouts/Layout.astro';
+import Lattice  from '@/components/Lattice.astro';
+import Bolt     from '@/components/Bolt.astro';
+import CncMill  from '@/components/CncMill.astro';
+---
+
+<Layout title="Benjamin Davis — Advanced Manufacturing">
+
+  <!-- ── Hero: digital twin of the card ───────────────────────────────────── -->
+  <section class="hero">
+    <Lattice />
+
+    <div class="container hero-body">
+
+      <!-- Card nameplate — CNC milled on load -->
+      <div class="nameplate">
+        <CncMill />
+        <Bolt position="tl" size={20} />
+        <Bolt position="tr" size={20} />
+        <Bolt position="bl" size={20} />
+        <Bolt position="br" size={20} />
+
+        <p class="np-location">Wrentham, MA &middot; Class of 2027</p>
+
+        <h1 class="np-name">Benjamin<br/>Davis</h1>
+
+        <div class="np-rule" aria-hidden="true"></div>
+
+        <p class="np-role">Advanced Manufacturing</p>
+
+        <p class="np-tapped" aria-label="This site is linked from the physical card">
+          <span class="np-tapped-dot" aria-hidden="true"></span>
+          you tapped in
+        </p>
+      </div>
+
+      <!-- Positioning statement -->
+      <p class="hero-statement">
+        Building machines that make industrial manufacturing accessible to anyone.
+      </p>
+
+      <div class="hero-ctas">
+        <a href="/research" class="btn btn-primary">See My Research</a>
+        <a href="/contact"  class="btn btn-ghost">Get in Touch</a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Three credential tiles ────────────────────────────────────────────── -->
+  <section class="credentials" aria-label="Key credentials">
+    <div class="container cred-grid">
+
+      <article class="cred-tile">
+        <span class="cred-mark" aria-hidden="true">&#9670;</span>
+        <h2 class="cred-title">Masason Foundation</h2>
+        <p class="cred-body">
+          Sought out by Masayoshi Son's global fellowship for exceptional young
+          innovators worldwide. One of a small international cohort of members.
+        </p>
+      </article>
+
+      <article class="cred-tile">
+        <span class="cred-mark" aria-hidden="true">&#9670;</span>
+        <h2 class="cred-title">Regeneron Young Scientist</h2>
+        <p class="cred-body">
+          One of two students worldwide to receive the ISEF 2025 Young Scientist
+          Award. 2nd highest overall score at the world's largest pre-college fair.
+        </p>
+      </article>
+
+      <article class="cred-tile cred-tile--gold">
+        <span class="cred-mark cred-mark--gold" aria-hidden="true">&#9670;</span>
+        <h2 class="cred-title cred-title--gold">$75,000 Scholarship</h2>
+        <p class="cred-body">
+          Won at ISEF 2025, Columbus, OH — alongside 1st Place in Engineering
+          Technology: Statics &amp; Dynamics.
+        </p>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ── Featured work: From Crude to Extrude ─────────────────────────────── -->
+  <section class="featured-work">
+    <div class="container fw-inner">
+
+      <div class="fw-image-wrap">
+        <img
+          src="/images/machine-full.jpg"
+          alt="The From Crude to Extrude desktop plastic recycling system on display at ISEF 2025 in Columbus, Ohio"
+          width="800"
+          height="600"
+          loading="lazy"
+          decoding="async"
+        />
+        <span class="fw-caption" aria-hidden="true">ISEF 2025 &middot; Columbus, OH</span>
+      </div>
+
+      <div class="fw-content">
+        <p class="fw-overline">Flagship Research</p>
+        <h2 class="fw-title">From Crude<br/>to Extrude</h2>
+        <p class="fw-desc">
+          A desktop machine combining extrusion and pultrusion into a single system —
+          recycling PET bottle waste and 3D-printing purge material into additive-manufacturing
+          filament within commercial tolerances.
+        </p>
+
+        <div class="spec-table" role="table" aria-label="Key results">
+          <div class="spec-row" role="row">
+            <span class="spec-key" role="rowheader">Energy</span>
+            <span class="spec-val" role="cell">43% more efficient than standard re-extrusion</span>
+          </div>
+          <div class="spec-row" role="row">
+            <span class="spec-key" role="rowheader">Particulate</span>
+            <span class="spec-val" role="cell">5&times; less than standard processes</span>
+          </div>
+          <div class="spec-row" role="row">
+            <span class="spec-key" role="rowheader">Cost</span>
+            <span class="spec-val" role="cell">~90% cheaper than commercial filament</span>
+          </div>
+          <div class="spec-row" role="row">
+            <span class="spec-key" role="rowheader">Build</span>
+            <span class="spec-val" role="cell">800+ hrs &middot; 50+ iterations &middot; 7 sub-systems</span>
+          </div>
+        </div>
+
+        <a href="/research" class="fw-link">Read the full project &rarr;</a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Site navigation tiles ─────────────────────────────────────────────── -->
+  <nav class="site-nav-tiles" aria-label="Explore the site">
+    <div class="container snt-grid">
+
+      <a href="/about" class="snt-tile">
+        <span class="snt-num">01</span>
+        <h3 class="snt-title">About</h3>
+        <p class="snt-desc">The engineer behind the machine — and everything else I am.</p>
+        <span class="snt-arrow" aria-hidden="true">&rarr;</span>
+      </a>
+
+      <a href="/research" class="snt-tile">
+        <span class="snt-num">02</span>
+        <h3 class="snt-title">Research&nbsp;&amp;&nbsp;Projects</h3>
+        <p class="snt-desc">From Crude to Extrude, TechForge, tactile tiles, robotics.</p>
+        <span class="snt-arrow" aria-hidden="true">&rarr;</span>
+      </a>
+
+      <a href="/blog" class="snt-tile">
+        <span class="snt-num">03</span>
+        <h3 class="snt-title">Blog</h3>
+        <p class="snt-desc">Build logs, engineering notes, science fair reflections.</p>
+        <span class="snt-arrow" aria-hidden="true">&rarr;</span>
+      </a>
+
+      <a href="/awards" class="snt-tile">
+        <span class="snt-num">04</span>
+        <h3 class="snt-title">Awards</h3>
+        <p class="snt-desc">ISEF, Masason, AJAS, Sigma Xi, and school distinctions.</p>
+        <span class="snt-arrow" aria-hidden="true">&rarr;</span>
+      </a>
+
+      <a href="/contact" class="snt-tile">
+        <span class="snt-num">05</span>
+        <h3 class="snt-title">Contact</h3>
+        <p class="snt-desc">Mentorship, collaboration, or media — reach out.</p>
+        <span class="snt-arrow" aria-hidden="true">&rarr;</span>
+      </a>
+
+    </div>
+  </nav>
+
+  <!-- ── Quote carousel ───────────────────────────────────────────────────── -->
+  <section class="quote-section" aria-label="What others say">
+    <div class="container">
+      <blockquote class="featured-quote" id="fq">
+        <p class="fq-text" id="fq-text"></p>
+        <cite class="fq-attr" id="fq-attr"></cite>
+      </blockquote>
+      <div class="fq-dots" aria-hidden="true" id="fq-dots"></div>
+    </div>
+  </section>
+
+  <script>
+  (function () {
+    const quotes = [
+      {
+        text: '“He learned, adapted, and persevered through adversity. And he has an extraordinary ability to explain complex ideas clearly, which is rare at any age.”',
+        attr: 'Mrs. Kelly Gomez — Science Fair Mentor & Teacher, Bishop Feehan High School',
+      },
+      {
+        text: '“His innovative approach showed technical rigor and extraordinary resilience in problem-solving. His clear communication of his sophisticated project helped him stand out.”',
+        attr: 'Jerome Smith — Head of Community Affairs, Amazon New England Region',
+      },
+      {
+        text: '“His work exemplifies what independent research should do: identify real-world problems, build practical solutions, and push the limits of creativity and determination.”',
+        attr: 'Helen Rosenfeld — Executive Director, Massachusetts Science & Engineering Fair',
+      },
+      {
+        text: '“ISEF was probably one of the best weeks of my life. It was amazing to be at an event with so many like-minded people who share my interest in science and engineering.”',
+        attr: 'Benjamin Davis — ISEF 2025, Columbus, OH',
+      },
+      {
+        text: '“I went through over 50 iterations of components and many redesigns. Although the science fair took over my life at times, I will never forget the incredible experience I had and the number of things I learned.”',
+        attr: 'Benjamin Davis — On the development of From Crude to Extrude',
+      },
+    ];
+
+    const INTERVAL = 6000;
+    const textEl = document.getElementById('fq-text');
+    const attrEl = document.getElementById('fq-attr');
+    const dotsEl = document.getElementById('fq-dots');
+    const bqEl   = document.getElementById('fq');
+    if (!textEl || !attrEl || !dotsEl || !bqEl) return;
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let idx = 0;
+
+    function setQuote(i) {
+      textEl.textContent = quotes[i].text;
+      attrEl.textContent = quotes[i].attr;
+      dotsEl.querySelectorAll('.fq-dot').forEach(function (d, di) {
+        d.classList.toggle('fq-dot--active', di === i);
+      });
+    }
+
+    quotes.forEach(function (_, i) {
+      const dot = document.createElement('button');
+      dot.className = 'fq-dot' + (i === 0 ? ' fq-dot--active' : '');
+      dot.setAttribute('aria-label', 'Quote ' + (i + 1) + ' of ' + quotes.length);
+      dot.addEventListener('click', function () {
+        clearInterval(timer);
+        idx = i;
+        transition(i);
+        timer = setInterval(advance, INTERVAL);
+      });
+      dotsEl.appendChild(dot);
+    });
+
+    setQuote(0);
+    if (reduced) return;
+
+    function transition(i) {
+      bqEl.classList.add('fq--out');
+      setTimeout(function () {
+        setQuote(i);
+        bqEl.classList.remove('fq--out');
+      }, 320);
+    }
+
+    function advance() {
+      idx = (idx + 1) % quotes.length;
+      transition(idx);
+    }
+
+    var timer = setInterval(advance, INTERVAL);
+    bqEl.addEventListener('mouseenter', function () { clearInterval(timer); });
+    bqEl.addEventListener('mouseleave', function () { timer = setInterval(advance, INTERVAL); });
+  })();
+  </script>
+
+  <!-- ── CTA band ───────────────────────────────────────────────────────────── -->
+  <section class="cta-band">
+    <div class="container cta-inner">
+      <p class="cta-text">Want to collaborate, connect, or just learn more?</p>
+      <a href="/contact" class="btn btn-primary">Get in Touch</a>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  /* ── Buttons ─────────────────────────────────────────────────────────────── */
+  .btn {
+    display: inline-block;
+    padding: 0.7rem 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .btn-primary {
+    background: var(--gold);
+    color: var(--graphite);
+    border: 1px solid var(--gold);
+  }
+  .btn-primary:hover {
+    background: var(--gold-bright);
+    border-color: var(--gold-bright);
+    color: var(--graphite);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--steel);
+    border: 1px solid var(--panel-edge);
+  }
+  .btn-ghost:hover {
+    color: var(--text);
+    border-color: var(--steel);
+  }
+
+  /* ── Hero ─────────────────────────────────────────────────────────────────── */
+  .hero {
+    position: relative;
+    min-height: calc(100svh - var(--nav-height));
+    display: flex;
+    align-items: center;
+    padding-block: 4rem;
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .hero-body {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    text-align: center;
+  }
+
+  /* Nameplate — the card face */
+  .nameplate {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    padding: 2.75rem 2.5rem 2rem;
+    background: color-mix(in srgb, var(--panel) 82%, transparent);
+    border: 1px solid var(--panel-edge);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.55rem;
+  }
+
+  .np-location {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--steel);
+  }
+
+  .np-name {
+    font-family: var(--font-head);
+    font-size: clamp(3.75rem, 14vw, 6rem);
+    font-weight: 900;
+    line-height: 0.9;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-block: 0.25rem;
+  }
+
+  .np-rule {
+    width: 72%;
+    height: 1px;
+    background: var(--panel-edge);
+    margin-block: 0.2rem;
+  }
+
+  .np-role {
+    font-family: var(--font-head);
+    font-size: clamp(0.85rem, 3.5vw, 1.1rem);
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--steel);
+  }
+
+  /* Subtle "you tapped in" nod — inside the nameplate like a card stamp */
+  .np-tapped {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.16em;
+    text-transform: lowercase;
+    color: var(--copper);
+    opacity: 0.65;
+    user-select: none;
+  }
+
+  .np-tapped-dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--copper);
+    flex-shrink: 0;
+    animation: blink 3s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.25; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .np-tapped-dot { animation: none; }
+  }
+
+  @media (max-width: 360px) {
+    .nameplate {
+      padding: 2rem 1.25rem 1.5rem;
+    }
+  }
+
+  /* Positioning statement */
+  .hero-statement {
+    font-size: clamp(0.95rem, 3vw, 1.1rem);
+    line-height: 1.6;
+    color: var(--text);
+    max-width: 420px;
+  }
+
+  .hero-ctas {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* ── Credential tiles ────────────────────────────────────────────────────── */
+  .credentials {
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .cred-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--panel-edge);
+  }
+
+  .cred-tile {
+    background: var(--panel);
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .cred-tile--gold {
+    background: color-mix(in srgb, var(--gold-dim) 15%, var(--panel));
+  }
+
+  .cred-mark {
+    font-size: 0.48rem;
+    color: var(--copper);
+  }
+
+  .cred-mark--gold {
+    color: var(--gold);
+  }
+
+  .cred-title {
+    font-family: var(--font-head);
+    font-size: 1.05rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    line-height: 1.1;
+    color: var(--text);
+  }
+
+  .cred-title--gold {
+    color: var(--gold);
+  }
+
+  .cred-body {
+    font-size: 0.8rem;
+    line-height: 1.65;
+    color: var(--steel);
+  }
+
+  @media (max-width: 600px) {
+    .cred-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* ── Featured work ───────────────────────────────────────────────────────── */
+  .featured-work {
+    padding-block: 4.5rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .fw-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: start;
+  }
+
+  .fw-image-wrap {
+    position: relative;
+  }
+
+  .fw-image-wrap img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border: 1px solid var(--panel-edge);
+    filter: brightness(0.88) contrast(1.08);
+    display: block;
+  }
+
+  .fw-caption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    padding: 0.3rem 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--steel);
+    background: color-mix(in srgb, var(--graphite) 88%, transparent);
+    border-top: 1px solid var(--panel-edge);
+    border-right: 1px solid var(--panel-edge);
+  }
+
+  .fw-overline {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--copper);
+    margin-bottom: 0.5rem;
+  }
+
+  .fw-title {
+    font-family: var(--font-head);
+    font-size: clamp(2.2rem, 6vw, 3.2rem);
+    font-weight: 900;
+    line-height: 0.93;
+    color: var(--text);
+    margin-bottom: 1rem;
+  }
+
+  .fw-desc {
+    font-size: 0.88rem;
+    line-height: 1.72;
+    color: var(--steel);
+    margin-bottom: 1.5rem;
+  }
+
+  /* Spec table — the spec-sheet aesthetic */
+  .spec-table {
+    border: 1px solid var(--panel-edge);
+    margin-bottom: 1.75rem;
+  }
+
+  .spec-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .spec-row:last-child { border-bottom: none; }
+
+  .spec-key {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--copper);
+    padding: 0.55rem 0.65rem;
+    border-right: 1px solid var(--panel-edge);
+    display: flex;
+    align-items: center;
+  }
+
+  .spec-val {
+    font-size: 0.78rem;
+    color: var(--text);
+    padding: 0.55rem 0.75rem;
+    display: flex;
+    align-items: center;
+    line-height: 1.4;
+  }
+
+  .fw-link {
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    transition: color 0.15s, letter-spacing 0.15s;
+    text-decoration: none;
+  }
+  .fw-link:hover {
+    color: var(--gold-bright);
+    letter-spacing: 0.12em;
+  }
+
+  @media (max-width: 680px) {
+    .fw-inner {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+  }
+
+  /* ── Site nav tiles ──────────────────────────────────────────────────────── */
+  .site-nav-tiles {
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .snt-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    background: var(--panel-edge);
+  }
+
+  .snt-tile {
+    background: var(--graphite);
+    padding: 1.5rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: var(--text);
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .snt-tile:hover {
+    background: var(--panel);
+    color: var(--text);
+  }
+  .snt-tile:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .snt-num {
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    letter-spacing: 0.1em;
+    color: var(--copper);
+    margin-bottom: 0.15rem;
+  }
+
+  .snt-title {
+    font-family: var(--font-head);
+    font-size: 0.95rem;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    color: var(--text);
+    line-height: 1.1;
+  }
+
+  .snt-desc {
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: var(--steel);
+    flex: 1;
+  }
+
+  .snt-arrow {
+    font-size: 0.8rem;
+    color: var(--gold);
+    margin-top: 0.5rem;
+    transition: transform 0.15s;
+    display: inline-block;
+  }
+  .snt-tile:hover .snt-arrow {
+    transform: translateX(3px);
+  }
+
+  @media (max-width: 780px) {
+    .snt-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    /* Last tile spans full width if odd count */
+    .snt-tile:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .snt-grid {
+      grid-template-columns: 1fr;
+    }
+    .snt-tile:last-child:nth-child(odd) {
+      grid-column: auto;
+    }
+  }
+
+  /* ── Quote carousel ──────────────────────────────────────────────────────── */
+  .quote-section {
+    padding-block: 4rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .featured-quote {
+    border-left: 2px solid var(--gold-dim);
+    padding: 1.5rem 2rem;
+    background: var(--panel);
+    max-width: 680px;
+    margin-inline: auto;
+    transition: opacity 0.32s ease, transform 0.32s ease;
+    min-height: 7rem;
+  }
+  .featured-quote.fq--out {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  .fq-text {
+    font-size: 0.98rem;
+    line-height: 1.78;
+    color: var(--text);
+    font-style: italic;
+    margin-bottom: 1rem;
+  }
+
+  .fq-attr {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--steel);
+    font-style: normal;
+    display: block;
+  }
+
+  .fq-dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.55rem;
+    margin-top: 1.25rem;
+  }
+
+  .fq-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--panel-edge);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .fq-dot:hover { background: var(--steel); }
+  .fq-dot--active { background: var(--gold-dim); }
+
+  /* ── CTA band ────────────────────────────────────────────────────────────── */
+  .cta-band {
+    padding-block: 3.5rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .cta-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+  }
+
+  .cta-text {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  @media (max-width: 480px) {
+    .cta-inner {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>

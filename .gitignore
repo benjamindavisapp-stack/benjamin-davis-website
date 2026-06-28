@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.astro/
+.env
+.env.*
+cnc-check.mjs
+cnc-dims.mjs
+cnc-verify.mjs

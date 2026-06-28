@@ -1,0 +1,1049 @@
+---
+import Layout     from '@/layouts/Layout.astro';
+import Lattice    from '@/components/Lattice.astro';
+import Bolt       from '@/components/Bolt.astro';
+import SLAText    from '@/components/SLAText.astro';
+
+const research = [
+  {
+    title:   'From Crude to Extrude',
+    summary: 'A desktop system that recycles PET plastic waste and 3D-printing purge material into additive-manufacturing filament at commercial tolerance.',
+    year:    '2024–2025',
+    tags:    ['ISEF 2025', 'Additive Manufacturing', 'Recycling', 'Systems Engineering'],
+    href:    '/research/from-crude-to-extrude',
+    featured: true,
+    image:   '/images/machine-full.jpg',
+    imageAlt: 'The From Crude to Extrude recycling machine at ISEF 2025',
+    highlight: 'Regeneron Young Scientist Award · $75K Scholarship · 1 of 2 worldwide',
+  },
+];
+
+const miniProjects = [
+  {
+    title:    'Javelin 2 — "Tennis Ball" Cannon',
+    summary:  'A pneumatic PVC cannon with a modified diaphragm sprinkler valve trigger, wooden A-frame, and 3D-printed sabots. Built for AP Physics 1 with two teammates — muzzle velocity >25 m/s, range >90 m, rated to 100+ PSI.',
+    year:     '2026',
+    context:  'AP Physics 1 · Bishop Feehan',
+    tags:     ['Pneumatics', 'PVC', '3D Printing', 'Fluid Dynamics', 'Physics'],
+    image:    '/images/cannon-6.jpg',
+    imageAlt: 'The completed Javelin 2 tennis ball cannon with its three student builders — Benjamin Davis (center) on the Bishop Feehan campus',
+    specs: [
+      { key: 'Muzzle velocity', val: '>25 m/s' },
+      { key: 'Range',           val: '>90 m' },
+      { key: 'Max pressure',    val: '100+ PSI' },
+    ],
+  },
+  {
+    title:    '10-Foot Water Rocket',
+    summary:  'Designed, built, and launched a 10-foot-tall water rocket — engineering the airframe, fins, and pressurized launch system from scratch, then testing flight performance against simulated predictions.',
+    year:     '2024–2025',
+    context:  'Personal build · Bishop Feehan',
+    tags:     ['Rocketry', 'Pneumatics', 'Aerodynamics', 'Fabrication'],
+    image:    '/images/engineering-launcher.jpg',
+    imageAlt: 'Benjamin Davis holding the pneumatic pressurization assembly for the water rocket launcher',
+    extra:    '/images/engineering-rocket.jpg',
+    extraAlt: 'Benjamin Davis preparing a water rocket at the launch pad for a test flight',
+    specs: [
+      { key: 'Height',    val: '10 ft' },
+      { key: 'Propellant', val: 'Water / compressed air' },
+    ],
+  },
+];
+
+const earlyBuilds = [
+  {
+    title:    'Lightning Generator',
+    summary:  'Built a high-voltage spark generator from scratch — a hands-on introduction to electronics, high-voltage safety, and electromagnetic phenomena before any formal coursework.',
+    period:   'Middle school',
+    tags:     ['Electronics', 'High Voltage', 'DIY'],
+    image:    '/images/lightning-generator.jpg',
+    imageAlt: 'Homemade high-voltage spark generator with visible electrical arc between terminals',
+  },
+  {
+    title:    'Rocket Engines — Build & Test',
+    summary:  'Designed and cast solid-fuel rocket engines, then tested them on a custom static fire stand. Measured thrust, tracked burn characteristics, and iterated on propellant formulation.',
+    period:   'Middle school',
+    tags:     ['Propulsion', 'Chemistry', 'Test & Measurement'],
+    image:    '/images/rocket-engine-test.gif',
+    imageAlt: 'Animated: rocket motor static fire test — engine burning on a concrete test stand',
+    isGif:    true,
+  },
+  {
+    title:    'Rockets & RockSim',
+    summary:  'Used RockSim to model rocket stability, altitude, and flight profiles before building. Fabricated and launched multiple designs, closing the loop between simulation output and real flight.',
+    period:   '2020–2022',
+    tags:     ['Rocketry', 'Simulation', 'RockSim', 'Fabrication'],
+    image:    '/images/rocket-launch.jpg',
+    imageAlt: 'A hand-built model rocket mid-flight seconds after launch from a field in Wrentham',
+    extra:    '/images/rocket-camp-1.jpg',
+    extraAlt: 'Young Benjamin Davis holding a hand-built rocket at a rocketry workshop',
+  },
+  {
+    title:    'Hydraulic Press',
+    summary:  'Built a hydraulic press from scratch.',
+    period:   'Middle school',
+    tags:     ['Hydraulics', 'Fabrication', 'Mechanical Engineering'],
+    image:    null,
+    imageAlt: 'Homemade hydraulic press',
+  },
+];
+
+const builds = [
+  {
+    title:   'Tactile Learning Tiles',
+    summary: 'Designed and fabricated tactile tiles for children with disabilities, donated to Pappas Rehabilitation Hospital for Children in Canton, MA.',
+    year:    '2024–2025',
+    tags:    ['TechForge', '3D Printing', 'Accessibility', 'Community'],
+    href:    null,
+    image:   null,
+    imageAlt: 'Tactile learning tiles designed for children with disabilities',
+  },
+  {
+    title:   'Santa Shop Conveyor',
+    summary: '3D-printed toy conveyor belt display for Bishop Feehan\'s annual Santa Shop — fully functional, designed from scratch, deployed in school.',
+    year:    '2024',
+    tags:    ['TechForge', '3D Printing', 'School'],
+    href:    null,
+    image:   null,
+    imageAlt: '',
+  },
+  {
+    title:   'Robotics Team',
+    summary: 'Grew the team 25%, secured $5,000 in funding for a new Bambu Lab H2C printer, and built a new organization and repair system.',
+    year:    '2023–present',
+    tags:    ['Leadership', 'FIRST / FTC', '3D Printing', 'CNC'],
+    href:    null,
+    image:   '/images/techforge-students.jpg',
+    imageAlt: 'Students working on a rocket launcher build project',
+  },
+  {
+    title:   'The Card',
+    summary: 'A precision-machined metal business card with embedded NFC + QR, anodized aluminum, CNC-machined lattice, and engraved copper inlay. The card you tapped.',
+    year:    '2025',
+    tags:    ['CNC', 'Metal', 'NFC', 'Design', 'Manufacturing'],
+    href:    '/research/the-card',
+    image:   '/images/card-front.webp',
+    imageAlt: 'The machined metal business card — front face with engraved nameplate and lattice',
+  },
+];
+---
+
+<Layout
+  title="Research & Projects — Benjamin Davis"
+  description="Advanced manufacturing research, fabrication projects, and builds by Benjamin Davis — including the ISEF 2025 Young Scientist Award-winning 'From Crude to Extrude' recycling system."
+>
+
+  <!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+  <section class="hero">
+    <Lattice />
+    <Bolt position="tl" />
+    <Bolt position="tr" />
+    <Bolt position="bl" />
+    <Bolt position="br" />
+    <div class="container hero-body">
+      <p class="hero-eyebrow">Research &amp; Projects</p>
+      <SLAText id="research-hero" duration={3} layers={2} delay={0.4}>
+        <h1 class="hero-heading">
+          From garage workshop<br/>
+          <span class="gold">to world stage.</span>
+        </h1>
+      </SLAText>
+      <p class="hero-sub">
+        Independent research &middot; Original fabrication &middot; Community builds
+      </p>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SECTION 1 — RESEARCH
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <section class="index-section">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">01</p>
+        <SLAText id="research-sec-01" duration={1.8} layers={1} trigger="scroll" delay={0.05}>
+          <h2 class="section-title">Research</h2>
+        </SLAText>
+      </div>
+
+      {research.map(p => (
+        <article class="featured-card">
+          <div class="fc-image-wrap">
+            <img
+              src={p.image}
+              alt={p.imageAlt}
+              width="800"
+              height="540"
+              loading="lazy"
+              decoding="async"
+            />
+            <span class="fc-year" aria-hidden="true">{p.year}</span>
+          </div>
+
+          <div class="fc-content">
+            <div class="fc-tags" aria-label="Tags">
+              {p.tags.map(t => <span class="tag">{t}</span>)}
+            </div>
+            <h3 class="fc-title">{p.title}</h3>
+            <p class="fc-summary">{p.summary}</p>
+            {p.highlight && (
+              <p class="fc-highlight">{p.highlight}</p>
+            )}
+            <a href={p.href} class="fc-link">
+              View full project &rarr;
+            </a>
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SECTION 2 — PROJECTS & BUILDS
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <section class="index-section index-section--dark">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">02</p>
+        <SLAText id="research-sec-02" duration={1.8} layers={1} trigger="scroll" delay={0.05}>
+          <h2 class="section-title">Projects &amp; Builds</h2>
+        </SLAText>
+      </div>
+
+      <div class="card-grid">
+        {builds.map(p => (
+          <article class="project-card">
+            <div class="pc-image-wrap">
+              {p.image
+                ? (
+                  <img
+                    src={p.image}
+                    alt={p.imageAlt}
+                    width="600"
+                    height="400"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )
+                : (
+                  <div
+                    class="pc-img-placeholder"
+                    role="img"
+                    aria-label={`[Photo placeholder — ${p.title}]`}
+                  >
+                    <span>[Photo: {p.title}]</span>
+                  </div>
+                )
+              }
+            </div>
+
+            <div class="pc-body">
+              <div class="pc-tags" aria-label="Tags">
+                {p.tags.map(t => <span class="tag">{t}</span>)}
+              </div>
+              <h3 class="pc-title">{p.title}</h3>
+              <p class="pc-year">{p.year}</p>
+              <p class="pc-summary">{p.summary}</p>
+              {p.href
+                ? <a href={p.href} class="pc-link">View project &rarr;</a>
+                : <span class="pc-link pc-link--disabled">Detail page coming soon</span>
+              }
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SECTION 3 — MINI-PROJECTS
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <section class="index-section">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">03</p>
+        <SLAText id="research-sec-03" duration={1.8} layers={1} trigger="scroll" delay={0.05}>
+          <h2 class="section-title">Mini-Projects</h2>
+        </SLAText>
+      </div>
+      <p class="section-intro">
+        Builds done for class, for curiosity, or because the opportunity was there.
+        Not research projects — just good engineering.
+      </p>
+
+      <div class="mini-grid">
+        {miniProjects.map((p, i) => (
+          <article class="mini-card">
+
+            <div class="mini-images">
+              {p.extra
+                ? (
+                  <div class="mini-image-pair">
+                    <img src={p.image} alt={p.imageAlt} width="600" height="800" loading="lazy" decoding="async" />
+                    <img src={p.extra} alt={p.extraAlt} width="600" height="800" loading="lazy" decoding="async" />
+                  </div>
+                )
+                : (
+                  <img src={p.image} alt={p.imageAlt} width="800" height="600" loading="lazy" decoding="async" />
+                )
+              }
+            </div>
+
+            <div class="mini-body">
+              <div class="mini-meta">
+                <span class="mini-num">0{i + 1}</span>
+                <span class="mini-context">{p.context}</span>
+                <span class="mini-year">{p.year}</span>
+              </div>
+
+              <h3 class="mini-title">{p.title}</h3>
+              <p class="mini-summary">{p.summary}</p>
+
+              <div class="mini-spec-row" role="table" aria-label="Key specs">
+                {p.specs.map(s => (
+                  <div class="mini-spec" role="row">
+                    <span class="mini-spec-key" role="rowheader">{s.key}</span>
+                    <span class="mini-spec-val" role="cell">{s.val}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div class="mini-tags" aria-label="Tags">
+                {p.tags.map(t => <span class="tag">{t}</span>)}
+              </div>
+            </div>
+
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SECTION 4 — EARLY BUILDS
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <section class="index-section index-section--dark">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">04</p>
+        <SLAText id="research-sec-04" duration={1.8} layers={1} trigger="scroll" delay={0.05}>
+          <h2 class="section-title">Early Builds</h2>
+        </SLAText>
+      </div>
+      <p class="section-intro">
+        Before high school, before the research — the projects that started it.
+        Engines, electricity, and rockets built mostly for the satisfaction of
+        seeing them work.
+      </p>
+
+      <div class="early-grid">
+        {earlyBuilds.map((p, i) => (
+          <article class="early-card">
+            <div class="ec-image-wrap">
+              {p.isGif
+                ? (
+                  <img
+                    src={p.image}
+                    alt={p.imageAlt}
+                    width="600"
+                    height="400"
+                    loading="lazy"
+                    class="ec-gif"
+                  />
+                )
+                : p.extra
+                ? (
+                  <div class="ec-image-pair">
+                    <img src={p.image} alt={p.imageAlt} width="600" height="800" loading="lazy" decoding="async" />
+                    <img src={p.extra} alt={p.extraAlt} width="600" height="800" loading="lazy" decoding="async" />
+                  </div>
+                )
+                : p.image
+                ? (
+                  <img
+                    src={p.image}
+                    alt={p.imageAlt}
+                    width="600"
+                    height="400"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )
+                : (
+                  <div class="ec-img-placeholder" role="img" aria-label={`[Photo placeholder — ${p.title}]`}>
+                    <span>[Photo: {p.title}]</span>
+                  </div>
+                )
+              }
+            </div>
+
+            <div class="ec-body">
+              <div class="ec-header">
+                <span class="ec-num">0{i + 1}</span>
+                <span class="ec-period">{p.period}</span>
+              </div>
+              <h3 class="ec-title">{p.title}</h3>
+              <p class="ec-summary">{p.summary}</p>
+              <div class="ec-tags" aria-label="Tags">
+                {p.tags.map(t => <span class="tag">{t}</span>)}
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  /* ── Hero ─────────────────────────────────────────────────────────────────── */
+  .hero {
+    position: relative;
+    padding-block: 5rem 4rem;
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .hero-body {
+    position: relative;
+    z-index: 1;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+
+  .hero-heading {
+    font-family: var(--font-head);
+    font-size: clamp(2rem, 7vw, 3.5rem);
+    font-weight: 900;
+    line-height: 1.05;
+    color: var(--text);
+  }
+
+  .hero-sub {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--steel);
+  }
+
+  /* ── Index sections ──────────────────────────────────────────────────────── */
+  .index-section {
+    padding-block: 4rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .index-section--dark {
+    background: var(--panel);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .section-overline {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    color: var(--copper);
+    flex-shrink: 0;
+  }
+
+  .section-title {
+    font-family: var(--font-head);
+    font-size: clamp(1.5rem, 5vw, 2.2rem);
+    font-weight: 900;
+    color: var(--text);
+  }
+
+  /* ── Tags (shared) ───────────────────────────────────────────────────────── */
+  .tag {
+    display: inline-block;
+    padding: 0.18rem 0.55rem;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.06em;
+    border: 1px solid var(--panel-edge);
+    color: var(--steel);
+    border-radius: 2px;
+  }
+
+  /* ── Featured card ───────────────────────────────────────────────────────── */
+  .featured-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--panel-edge);
+    background: var(--panel);
+    overflow: hidden;
+  }
+
+  .fc-image-wrap {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .fc-image-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: brightness(0.85) contrast(1.08);
+    display: block;
+    transition: filter 0.3s;
+  }
+
+  .featured-card:hover .fc-image-wrap img {
+    filter: brightness(0.9) contrast(1.06);
+  }
+
+  .fc-year {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 0.3rem 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    color: var(--steel);
+    background: color-mix(in srgb, var(--graphite) 85%, transparent);
+    border-left: 1px solid var(--panel-edge);
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .fc-content {
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    border-left: 1px solid var(--panel-edge);
+  }
+
+  .fc-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .fc-title {
+    font-family: var(--font-head);
+    font-size: clamp(1.6rem, 4vw, 2.4rem);
+    font-weight: 900;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  .fc-summary {
+    font-size: 0.9rem;
+    line-height: 1.72;
+    color: var(--steel);
+    flex: 1;
+  }
+
+  .fc-highlight {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--gold-dim);
+    background: color-mix(in srgb, var(--gold-dim) 20%, transparent);
+  }
+
+  .fc-link {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    text-decoration: none;
+    transition: color 0.15s, letter-spacing 0.15s;
+    margin-top: auto;
+  }
+  .fc-link:hover { color: var(--gold-bright); letter-spacing: 0.12em; }
+
+  @media (max-width: 680px) {
+    .featured-card { grid-template-columns: 1fr; }
+    .fc-image-wrap { aspect-ratio: 16 / 9; }
+    .fc-content { border-left: none; border-top: 1px solid var(--panel-edge); padding: 1.5rem; }
+  }
+
+  /* ── Project card grid ───────────────────────────────────────────────────── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1px;
+    background: var(--panel-edge);
+    border: 1px solid var(--panel-edge);
+  }
+
+  .project-card {
+    background: var(--graphite);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pc-image-wrap {
+    overflow: hidden;
+    aspect-ratio: 3 / 2;
+  }
+
+  .pc-image-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: brightness(0.82) contrast(1.08);
+    display: block;
+    transition: filter 0.25s;
+  }
+
+  .project-card:hover .pc-image-wrap img {
+    filter: brightness(0.9) contrast(1.05);
+  }
+
+  .pc-img-placeholder {
+    width: 100%;
+    height: 100%;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-edge);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pc-img-placeholder span {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    color: var(--steel);
+    opacity: 0.5;
+  }
+
+  .pc-body {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex: 1;
+  }
+
+  .pc-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-bottom: 0.15rem;
+  }
+
+  .pc-title {
+    font-family: var(--font-head);
+    font-size: 1.05rem;
+    font-weight: 900;
+    color: var(--text);
+    line-height: 1.1;
+  }
+
+  .pc-year {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    color: var(--copper);
+  }
+
+  .pc-summary {
+    font-size: 0.8rem;
+    line-height: 1.62;
+    color: var(--steel);
+    flex: 1;
+    margin-top: 0.15rem;
+  }
+
+  .pc-link {
+    display: inline-block;
+    margin-top: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    color: var(--gold);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .pc-link:hover { color: var(--gold-bright); }
+
+  .pc-link--disabled {
+    color: var(--panel-edge);
+    cursor: default;
+    font-size: 0.62rem;
+  }
+
+  /* ── Placeholder sections ────────────────────────────────────────────────── */
+  .placeholder-section {
+    border: 1px dashed var(--panel-edge);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .placeholder-label {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    color: var(--copper);
+  }
+
+  .placeholder-desc {
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--steel);
+    max-width: 520px;
+  }
+
+  .placeholder-card-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    background: var(--panel-edge);
+    border: 1px solid var(--panel-edge);
+    margin-top: 0.5rem;
+  }
+
+  .placeholder-card {
+    background: var(--graphite);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 200px;
+    flex: 1;
+  }
+
+  .index-section--dark .placeholder-card { background: var(--panel); }
+
+  .placeholder-num {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    color: var(--copper);
+    letter-spacing: 0.1em;
+  }
+
+  .placeholder-text {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--steel);
+    opacity: 0.45;
+    font-style: italic;
+  }
+
+  /* ── Mini-projects grid ─────────────────────────────────────────────────── */
+  .mini-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 1px;
+    background: var(--panel-edge);
+    border: 1px solid var(--panel-edge);
+  }
+
+  .mini-card {
+    background: var(--graphite);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mini-images {
+    overflow: hidden;
+    aspect-ratio: 3 / 2;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .mini-images img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: brightness(0.85) contrast(1.08);
+  }
+
+  .mini-image-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    height: 100%;
+    gap: 1px;
+    background: var(--panel-edge);
+  }
+
+  .mini-image-pair img {
+    object-position: center top;
+  }
+
+  .mini-body {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    flex: 1;
+  }
+
+  .mini-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .mini-num {
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    letter-spacing: 0.12em;
+    color: var(--copper);
+  }
+
+  .mini-context {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    color: var(--steel);
+  }
+
+  .mini-year {
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    letter-spacing: 0.1em;
+    color: var(--panel-edge);
+    margin-left: auto;
+  }
+
+  .mini-title {
+    font-family: var(--font-head);
+    font-size: clamp(1rem, 3vw, 1.3rem);
+    font-weight: 900;
+    color: var(--text);
+    line-height: 1.1;
+  }
+
+  .mini-summary {
+    font-size: 0.82rem;
+    line-height: 1.65;
+    color: var(--steel);
+    flex: 1;
+  }
+
+  .mini-spec-row {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--panel-edge);
+  }
+
+  .mini-spec {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .mini-spec:last-child { border-bottom: none; }
+
+  .mini-spec-key {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--copper);
+    padding: 0.45rem 0.6rem;
+    border-right: 1px solid var(--panel-edge);
+    display: flex;
+    align-items: center;
+    background: color-mix(in srgb, var(--graphite) 60%, var(--panel));
+  }
+
+  .mini-spec-val {
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 900;
+    color: var(--gold);
+    padding: 0.4rem 0.7rem;
+    display: flex;
+    align-items: center;
+  }
+
+  .mini-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  /* ── Section intro text ──────────────────────────────────────────────────── */
+  .section-intro {
+    font-size: 0.92rem;
+    line-height: 1.72;
+    color: var(--steel);
+    max-width: 580px;
+    margin-bottom: 2rem;
+  }
+
+  /* ── Early builds grid ───────────────────────────────────────────────────── */
+  .early-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--panel-edge);
+    border: 1px solid var(--panel-edge);
+  }
+
+  .early-card {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    background: var(--panel);
+    min-height: 260px;
+  }
+
+  .early-card:nth-child(even) {
+    grid-template-columns: 1fr 380px;
+  }
+
+  .early-card:nth-child(even) .ec-image-wrap {
+    order: 2;
+    border-left: 1px solid var(--panel-edge);
+    border-right: none;
+  }
+
+  .ec-image-wrap {
+    overflow: hidden;
+    border-right: 1px solid var(--panel-edge);
+    background: var(--graphite);
+  }
+
+  .ec-image-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: brightness(0.88) contrast(1.08);
+  }
+
+  .ec-gif {
+    /* GIFs autoplay in browser — no filter to preserve flame colors */
+    filter: none !important;
+  }
+
+  .ec-img-placeholder {
+    width: 100%;
+    height: 100%;
+    background: var(--panel);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ec-img-placeholder span {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    color: var(--steel);
+    opacity: 0.45;
+  }
+
+  .ec-image-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    height: 100%;
+    gap: 1px;
+    background: var(--panel-edge);
+  }
+
+  .ec-image-pair img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: brightness(0.88) contrast(1.07);
+  }
+
+  .ec-body {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    justify-content: center;
+  }
+
+  .ec-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .ec-num {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    color: var(--copper);
+  }
+
+  .ec-period {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+  }
+
+  .ec-title {
+    font-family: var(--font-head);
+    font-size: clamp(1.2rem, 3.5vw, 1.8rem);
+    font-weight: 900;
+    color: var(--text);
+    line-height: 1.05;
+  }
+
+  .ec-summary {
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: var(--steel);
+  }
+
+  .ec-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+  }
+
+  @media (max-width: 700px) {
+    .early-card,
+    .early-card:nth-child(even) {
+      grid-template-columns: 1fr;
+    }
+
+    .early-card:nth-child(even) .ec-image-wrap {
+      order: 0;
+      border-left: none;
+      border-right: none;
+      border-bottom: 1px solid var(--panel-edge);
+    }
+
+    .ec-image-wrap {
+      border-right: none;
+      border-bottom: 1px solid var(--panel-edge);
+      aspect-ratio: 16 / 9;
+    }
+
+    .ec-image-wrap img,
+    .ec-gif {
+      height: 100%;
+    }
+  }
+</style>

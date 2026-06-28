@@ -1,0 +1,1117 @@
+---
+// PCBText.astro — PCB/circuit-board text reveal.
+// Wraps any heading; on scroll-into-view it fabricates the text as copper
+// traces on an FR4 board: trace routing → copper pour → vias → soldermask
+// sweep → silkscreen + ENIG pads + optional LED glow.
+// Real heading stays in DOM (correct tag/level); canvas is aria-hidden.
+//
+//   <PCBText id="contact-hero" duration={3.5} delay={0.4}>
+//     <h1 class="ct-heading">Your heading</h1>
+//   </PCBText>
+interface Props {
+  duration?:  number;           // total seconds (default 3.5)
+  delay?:     number;           // start delay in seconds (default 0.25)
+  trigger?:   'scroll' | 'load';
+  maskColor?: 'green' | 'accent' | 'blue';  // soldermask tint (default green)
+  id?:        string;
+  class?:     string;
+}
+const {
+  duration  = 3.5,
+  delay     = 0.25,
+  trigger   = 'scroll',
+  maskColor = 'green',
+  id,
+  class: cls,
+} = Astro.props;
+const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
+---
+
+<div
+  class:list={['pcb-wrap', cls]}
+  data-pcb-duration={String(duration)}
+  data-pcb-delay={String(delay)}
+  data-pcb-trigger={trigger}
+  data-pcb-mask={maskColor}
+  data-pcb-id={pcbId}
+>
+  <slot />
+  <canvas class="pcb-bed" aria-hidden="true"></canvas>
+  <canvas class="pcb-fx"  aria-hidden="true"></canvas>
+</div>
+
+<style>
+  .pcb-wrap { position: relative; display: block; }
+  .pcb-bed,
+  .pcb-fx {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none; display: block;
+  }
+  .pcb-bed { z-index: 10; }
+  .pcb-fx  { z-index: 11; }
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  const REDUCED    = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let   nActive    = 0;
+  const MAX_ACT    = 2;
+  const TRACE_W    = 2.5;   // copper trace stroke width (logical px)
+  const SNAP       = 2;     // path quantisation grid — produces 45°/90° routing
+  const VIA_R      = 4.5;   // via outer radius (logical px, before via-scale S)
+  const VIA_HOLE   = 2.0;   // drilled hole radius
+  const MAX_VIAS   = 10;
+  const POUR_PITCH = 3;     // copper pour scan-line pitch
+
+  /* ── Board / mask colour palettes ──────────────────────────────────────── */
+  const BOARD_BG: Record<string, string> = {
+    green: '#0d2318', accent: '#0e0c08', blue: '#0a1028',
+  };
+  const FIBER_COL: Record<string, string> = {
+    green: 'rgba(14,42,24,0.55)', accent: 'rgba(22,18,8,0.50)', blue: 'rgba(12,18,52,0.55)',
+  };
+  const DIAG_COL: Record<string, string> = {
+    green: 'rgba(18,48,28,0.26)', accent: 'rgba(28,22,10,0.28)', blue: 'rgba(14,20,60,0.26)',
+  };
+  const MASK_RGBA: Record<string, string> = {
+    green: 'rgba(9,30,18,0.60)', accent: 'rgba(12,10,5,0.58)', blue: 'rgba(8,12,36,0.60)',
+  };
+  const MASK_GLOW: Record<string, string> = {
+    green: 'rgba(30,160,70,0.38)', accent: 'rgba(200,140,50,0.32)', blue: 'rgba(40,100,220,0.34)',
+  };
+
+  /* ── Utilities ─────────────────────────────────────────────────────────── */
+  function mk(w: number, h: number): HTMLCanvasElement {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; return c;
+  }
+  function eio(t: number) { return t < 0.5 ? 2*t*t : -1 + (4-2*t)*t; }
+  function mkRng(seed: number): () => number {
+    let s = (seed >>> 0) || 1;
+    return () => { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (s >>> 0) / 0x100000000; };
+  }
+
+  /* ── FR4 board texture ─────────────────────────────────────────────────── */
+  function renderBoard(ctx: CanvasRenderingContext2D, W: number, H: number, mc: string) {
+    ctx.fillStyle = BOARD_BG[mc] || BOARD_BG.green;
+    ctx.fillRect(0, 0, W, H);
+
+    // Fiber weave — horizontal + vertical grid
+    ctx.strokeStyle = FIBER_COL[mc] || FIBER_COL.green;
+    ctx.lineWidth = 0.6;
+    const FP = 8;
+    for (let x = FP; x < W; x += FP) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y = FP; y < H; y += FP) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+    // Diagonal cross-weave
+    ctx.strokeStyle = DIAG_COL[mc] || DIAG_COL.green;
+    ctx.lineWidth = 0.35;
+    for (let d = -(H*2); d < W+H; d += FP*1.414) {
+      ctx.beginPath(); ctx.moveTo(d,0); ctx.lineTo(d+H,H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(d+H,0); ctx.lineTo(d,H); ctx.stroke();
+    }
+
+    // Subtle board sheen
+    const sh = ctx.createLinearGradient(0, 0, W*0.35, H*0.35);
+    sh.addColorStop(0, 'rgba(255,255,230,0.05)');
+    sh.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sh; ctx.fillRect(0, 0, W, H);
+
+    // Edge keepout hint (faint copper trace border)
+    ctx.strokeStyle = 'rgba(180,100,40,0.14)'; ctx.lineWidth = 0.8;
+    ctx.strokeRect(2, 2, W-4, H-4);
+  }
+
+  /* ── Copper surface (for mask composite) ──────────────────────────────── */
+  function renderCopper(ctx: CanvasRenderingContext2D, W: number, H: number) {
+    ctx.fillStyle = '#c87941';
+    ctx.fillRect(0, 0, W, H);
+    // Foil reflection lines
+    ctx.strokeStyle = 'rgba(232,138,50,0.22)'; ctx.lineWidth = 0.5;
+    for (let y = 0; y < H; y += 1.5) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    // Specular highlight
+    const hl = ctx.createLinearGradient(0, 0, W*0.3, H*0.2);
+    hl.addColorStop(0, 'rgba(255,205,130,0.28)');
+    hl.addColorStop(1, 'rgba(255,180,70,0)');
+    ctx.fillStyle = hl; ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ── Glyph pixel mask (same Range API pattern as FDMText / SLSText) ──── */
+  function buildMask(wrap: HTMLElement, heading: HTMLElement, W: number, H: number) {
+    const off = mk(W, H);
+    const ctx = off.getContext('2d')!;
+    const pr  = wrap.getBoundingClientRect();
+    const range = document.createRange();
+    ctx.fillStyle = '#fff';
+    function walk(node: Node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const txt = (node.textContent || '').trim();
+        if (!txt) return;
+        const el = (node.parentElement ?? heading) as HTMLElement;
+        const cs = window.getComputedStyle(el);
+        ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        ctx.textBaseline = 'alphabetic';
+        const m = ctx.measureText(txt);
+        range.selectNode(node);
+        for (const r of Array.from(range.getClientRects())) {
+          if (r.width < 2) continue;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(r.left - pr.left, r.top - pr.top, r.width + 1, r.height + 1);
+          ctx.clip();
+          ctx.fillText(txt, r.left - pr.left, r.top - pr.top + m.fontBoundingBoxAscent);
+          ctx.restore();
+        }
+      } else { node.childNodes.forEach(walk); }
+    }
+    walk(heading);
+    return ctx.getImageData(0, 0, W, H).data;
+  }
+
+  function inLtr(mpx: Uint8ClampedArray, W: number, H: number, x: number, y: number) {
+    const xi = Math.max(0, Math.min(W-1, Math.round(x)));
+    const yi = Math.max(0, Math.min(H-1, Math.round(y)));
+    return mpx[(yi*W+xi)*4] > 60;
+  }
+
+  /* ── Letter contour (same as FDMText) ──────────────────────────────────── */
+  function extractContour(mpx: Uint8ClampedArray, W: number, H: number) {
+    type P = { x: number; y: number; gap?: true };
+    const bot: P[] = [], top: P[] = [];
+    for (let x = 0; x < W; x++) {
+      let yt = -1, yb = -1;
+      for (let y = 0; y < H; y++) {
+        if (mpx[(y*W+x)*4] > 60) { if (yt < 0) yt = y; yb = y; }
+      }
+      if (yt >= 0) { bot.push({ x, y: yb+1.5 }); top.push({ x, y: yt-1.5 }); }
+    }
+    const path: P[] = [];
+    for (let i = 0; i < bot.length; i++) {
+      if (i > 0 && bot[i].x - bot[i-1].x > 6) path.push({ ...bot[i], gap: true });
+      else path.push(bot[i]);
+    }
+    for (let i = top.length-1; i >= 0; i--) {
+      if (i < top.length-1 && top[i+1].x - top[i].x > 6) path.push({ ...top[i], gap: true });
+      else path.push(top[i]);
+    }
+    return path;
+  }
+
+  /* ── Quantise path to 45°/90° PCB routing grid ─────────────────────────
+     Each step between two points is decomposed into at most two moves:
+     a 45° diagonal and a remaining orthogonal — the standard "45°-first"
+     routing style used by real autorouters.
+  ─────────────────────────────────────────────────────────────────────────*/
+  function quantizePath(pts: { x: number; y: number; gap?: true }[], snap: number) {
+    type QP = [number, number, boolean]; // [x, y, isGap]
+    const result: QP[] = [];
+    if (!pts.length) return result;
+
+    let cx = Math.round(pts[0].x / snap) * snap;
+    let cy = Math.round(pts[0].y / snap) * snap;
+    result.push([cx, cy, false]);
+
+    for (let i = 1; i < pts.length; i++) {
+      const p = pts[i];
+      if (p.gap) {
+        cx = Math.round(p.x / snap) * snap;
+        cy = Math.round(p.y / snap) * snap;
+        result.push([cx, cy, true]);
+        continue;
+      }
+      const tx = Math.round(p.x / snap) * snap;
+      const ty = Math.round(p.y / snap) * snap;
+      if (tx === cx && ty === cy) continue;
+
+      const dx = tx - cx, dy = ty - cy;
+      const sx = Math.sign(dx), sy = Math.sign(dy);
+      const diag = Math.min(Math.abs(dx), Math.abs(dy));
+      if (diag > 0) { cx += sx*diag; cy += sy*diag; result.push([cx, cy, false]); }
+      if (cx !== tx) { cx = tx; result.push([cx, cy, false]); }
+      if (cy !== ty) { cy = ty; result.push([tx, ty, false]); }
+    }
+    return result;
+  }
+
+  /* ── Via candidates: corners in the quantised path ─────────────────────── */
+  function genVias(path: [number, number, boolean][], minDist: number, max: number) {
+    const vias: [number, number][] = [];
+    for (let i = 1; i < path.length - 1; i++) {
+      if (path[i][2] || path[i-1][2] || path[i+1][2]) continue;
+      const [px, py] = path[i-1], [cx, cy] = path[i], [nx, ny] = path[i+1];
+      // Skip if same direction (not a corner)
+      if ((cx-px === nx-cx) && (cy-py === ny-cy)) continue;
+      if (vias.every(([vx, vy]) => Math.hypot(cx-vx, cy-vy) > minDist)) {
+        vias.push([cx, cy]);
+        if (vias.length >= max) break;
+      }
+    }
+    return vias;
+  }
+
+  /* ── Dense copper pour (horizontal scan lines, snaking) ─────────────────── */
+  function genPour(mpx: Uint8ClampedArray, W: number, H: number, pitch: number) {
+    const segs: [number, number, number, number][] = [];
+    let ltr = true;
+    for (let iy = 0; ; iy++) {
+      const y = pitch * 0.5 + iy * pitch;
+      if (y >= H) break;
+      let inSeg = false, sx = 0;
+      for (let x = 0; x <= W; x++) {
+        const inside = x < W && inLtr(mpx, W, H, x, y);
+        if (inside && !inSeg) { sx = x; inSeg = true; }
+        else if (!inside && inSeg) {
+          const ex = x - 1;
+          if (ex > sx + 1) { segs.push(ltr ? [sx, y, ex, y] : [ex, y, sx, y]); ltr = !ltr; }
+          inSeg = false;
+        }
+      }
+    }
+    return segs;
+  }
+
+  /* ── PCB routing head — glow + crosshair + engineering HUD overlay ─────── */
+  function drawRoutingHead(
+    ctx: CanvasRenderingContext2D,
+    x: number, y: number,
+    routingAge: number,
+    W: number, H: number,
+  ) {
+    ctx.save();
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, 16);
+    glow.addColorStop(0,    'rgba(220,150,60,0.65)');
+    glow.addColorStop(0.35, 'rgba(200,110,30,0.28)');
+    glow.addColorStop(1,    'rgba(180,80,10,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,190,80,0.45)'; ctx.lineWidth = 0.6;
+    ctx.beginPath(); ctx.moveTo(x-12, y); ctx.lineTo(x+12, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y-12); ctx.lineTo(x, y+12); ctx.stroke();
+    ctx.fillStyle = '#ffdb80';
+    ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+
+    // HUD fades in after 0.1 s of routing
+    const hudAlpha = Math.max(0, Math.min(1, (routingAge - 0.1) / 0.15));
+    if (hudAlpha > 0) {
+      const xStr = (x * 3.937).toFixed(1).padStart(7);
+      const yStr = (y * 3.937).toFixed(1).padStart(7);
+      const coordLine = `X:${xStr}  Y:${yStr}`;
+      const PAD = 5;
+
+      ctx.font = '7px "IBM Plex Mono", monospace';
+      ctx.textBaseline = 'top';
+      ctx.textAlign    = 'left';
+      const coordW = ctx.measureText(coordLine).width;
+      const t01W   = ctx.measureText('T01').width;
+      const hudW   = PAD + coordW + PAD + t01W + PAD;
+      const hudH   = 16;
+
+      // Clamp so HUD stays inside canvas
+      let hx = x + 18;
+      let hy = y - hudH / 2;
+      if (hx + hudW > W - 2) hx = x - 18 - hudW;
+      if (hy < 2)             hy = 2;
+      if (hy + hudH > H - 2) hy = H - hudH - 2;
+
+      ctx.globalAlpha = hudAlpha;
+
+      // Panel background — #23262c at 0.8 alpha
+      ctx.fillStyle = 'rgba(35,38,44,0.80)';
+      ctx.fillRect(hx, hy, hudW, hudH);
+      ctx.strokeStyle = '#23262c';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(hx + 0.5, hy + 0.5, hudW - 1, hudH - 1);
+
+      const ty = hy + (hudH - 7) / 2;   // vertically centred for 7 px text
+
+      // Coordinate readout
+      ctx.fillStyle = '#c8b98a';
+      ctx.fillText(coordLine, hx + PAD, ty);
+
+      // T01 tag — top-right of HUD, copper accent
+      ctx.fillStyle  = '#c87941';
+      ctx.textAlign  = 'right';
+      ctx.fillText('T01', hx + hudW - PAD, ty);
+      ctx.textAlign  = 'left';
+
+      ctx.globalAlpha  = 1;
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    ctx.restore();
+  }
+
+  /* ── Teardrop fillet — blends trace end smoothly into via pad ───────────── */
+  function drawTeardrop(
+    ctx: CanvasRenderingContext2D,
+    traceX: number, traceY: number,
+    viaX: number,   viaY: number,
+    traceW: number, viaR: number,
+  ) {
+    const dx = viaX - traceX, dy = viaY - traceY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 1) return;
+    const θ    = Math.atan2(dy, dx);
+    const cosθ = Math.cos(θ), sinθ = Math.sin(θ);
+    const hw   = traceW / 2;
+
+    // Trace-end edge points, perpendicular to approach direction
+    const p1x = traceX + hw * sinθ,  p1y = traceY - hw * cosθ;
+    const p2x = traceX - hw * sinθ,  p2y = traceY + hw * cosθ;
+    // Tangent points on via ring at the same perpendicular
+    const q1x = viaX + viaR * sinθ,  q1y = viaY - viaR * cosθ;
+    const q2x = viaX - viaR * sinθ,  q2y = viaY + viaR * cosθ;
+
+    // Control points pulled along the approach axis for a smooth taper
+    const pull = Math.min(dist * 0.55, viaR * 2.5);
+    const c1ax = p1x + pull * cosθ,  c1ay = p1y + pull * sinθ;
+    const c1bx = q1x - pull * cosθ,  c1by = q1y - pull * sinθ;
+    const c2ax = q2x - pull * cosθ,  c2ay = q2y - pull * sinθ;
+    const c2bx = p2x + pull * cosθ,  c2by = p2y + pull * sinθ;
+
+    // Arc q1→q2 anticlockwise sweeps the trace-facing half of the ring
+    const a1 = Math.atan2(q1y - viaY, q1x - viaX);
+    const a2 = Math.atan2(q2y - viaY, q2x - viaX);
+
+    ctx.save();
+    ctx.fillStyle = '#c87941';
+    ctx.beginPath();
+    ctx.moveTo(p1x, p1y);
+    ctx.bezierCurveTo(c1ax, c1ay, c1bx, c1by, q1x, q1y);
+    ctx.arc(viaX, viaY, viaR, a1, a2, true);
+    ctx.bezierCurveTo(c2ax, c2ay, c2bx, c2by, p2x, p2y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* ── Thermal relief — four radial spoke cuts in copper pour around via ───── */
+  function drawThermalRelief(
+    ctx: CanvasRenderingContext2D,
+    x: number, y: number,
+    padR: number, traceW: number, boardBgColor: string,
+  ) {
+    ctx.save();
+    ctx.strokeStyle = boardBgColor;
+    ctx.lineWidth   = traceW;
+    ctx.lineCap     = 'butt';
+    const innerR = padR * 0.6;
+    const outerR = padR * 1.4;
+    for (let i = 0; i < 4; i++) {
+      const a = (Math.PI / 2) * i;
+      ctx.beginPath();
+      ctx.moveTo(x + innerR * Math.cos(a), y + innerR * Math.sin(a));
+      ctx.lineTo(x + outerR * Math.cos(a), y + outerR * Math.sin(a));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* ── Fiducial marks — copper registration targets, three corners ─────────── */
+  function drawFiducials(
+    ctx: CanvasRenderingContext2D,
+    W: number, H: number,
+    f: number, boardBg: string,
+  ) {
+    if (f <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = f * 0.7;
+    const M = 12;
+    const corners: [number, number][] = [
+      [M,     M    ],   // top-left
+      [W - M, M    ],   // top-right
+      [M,     H - M],   // bottom-left
+    ];
+    for (const [cx, cy] of corners) {
+      // Soldermask clearance ring — reveals board bg, 7 px radius
+      ctx.fillStyle = boardBg;
+      ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
+      // Copper outer ring, 4 px radius
+      ctx.fillStyle = '#c87941';
+      ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+      // Centre copper dot, 1.2 px radius
+      ctx.beginPath(); ctx.arc(cx, cy, 1.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* ── Via spark particle (pre-generated once per via, reused every frame) ─── */
+  type ViaSpark = {
+    angle: number;  // outward direction (rad)
+    r: number;      // max travel distance (px)
+    len: number;    // trailing line length (px)
+    col: number;    // 0=copper-orange … 1=white
+    f0: number;     // global via-f at birth
+    f1: number;     // global via-f at death
+  };
+
+  function genViaSparks(rng: () => number): ViaSpark[] {
+    const out: ViaSpark[] = [];
+    const nc = 3 + Math.floor(rng() * 3);   // 3–5 contact sparks
+    const nd = 4 + Math.floor(rng() * 3);   // 4–6 debris particles
+    for (let i = 0; i < nc; i++) {
+      const f0 = 0.13 + rng() * 0.06;
+      out.push({ angle: rng() * Math.PI * 2, r: 4 + rng() * 7, len: 2 + rng() * 3,
+                 col: rng() > 0.4 ? 1 : 0, f0, f1: f0 + 0.09 });
+    }
+    for (let i = 0; i < nd; i++) {
+      const f0 = 0.20 + rng() * 0.22;
+      out.push({ angle: (i / nd) * Math.PI * 2 + (rng() - 0.5) * 0.9,
+                 r: 5 + rng() * 9, len: 1.5 + rng() * 2,
+                 col: rng() * 0.35, f0, f1: f0 + 0.11 });
+    }
+    return out;
+  }
+
+  /* ── Plated through-hole via — four-phase drilling animation (f 0→1) ─────── */
+  function drawVia(
+    ctx: CanvasRenderingContext2D,
+    x: number, y: number,
+    f: number, mc: string,
+    sparks: ViaSpark[]
+  ) {
+    if (f <= 0) return;
+    ctx.save();
+
+    const p1 = Math.min(1, f / 0.20);
+    const p2 = f > 0.20 ? Math.min(1, (f - 0.20) / 0.35) : 0;
+    const p3 = f > 0.55 ? Math.min(1, (f - 0.55) / 0.20) : 0;
+    const p4 = f > 0.75 ? Math.min(1, (f - 0.75) / 0.25) : 0;
+
+    // Soldermask clearance — board colour punches through mask once hole opens
+    if (f > 0.20) {
+      ctx.fillStyle = BOARD_BG[mc] || BOARD_BG.green;
+      ctx.beginPath(); ctx.arc(x, y, VIA_R + 1.8, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Copper annular ring builds inside-out (barrel plating, p3)
+    if (p3 > 0) {
+      ctx.fillStyle = '#c87941';
+      ctx.beginPath();
+      ctx.arc(x, y, VIA_HOLE + (VIA_R - VIA_HOLE) * eio(p3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // ENIG gold settles on ring (p4)
+    if (p4 > 0) {
+      const g = ctx.createRadialGradient(x - VIA_R * 0.3, y - VIA_R * 0.3, 0, x, y, VIA_R);
+      g.addColorStop(0, `rgba(225,185,100,${+(0.55 * p4).toFixed(2)})`);
+      g.addColorStop(1, 'rgba(180,120,40,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, VIA_R, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Drilled hole — grows through p2, locks at VIA_HOLE once plating begins
+    if (p2 > 0) {
+      ctx.fillStyle = '#060c08';
+      ctx.beginPath();
+      ctx.arc(x, y, p3 > 0 ? VIA_HOLE : VIA_HOLE * eio(p2), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Drill bit: descends p1 → wobbles p2 → fades end-of-p2 → retracts briefly p4
+    const drillAlpha = p3 === 0
+      ? (p2 > 0.8 ? 1 - (p2 - 0.8) / 0.2 : 1)
+      : (p4 > 0 ? Math.max(0, (0.5 - p4) / 0.5) : 0);
+
+    if (drillAlpha > 0.01) {
+      const wobble = p2 > 0 && p3 === 0 ? Math.sin(p2 * Math.PI * 22) * 0.5 : 0;
+      const tipY = p3 === 0
+        ? (p1 < 1 ? y - 18 * (1 - p1) : y + wobble)
+        : y - 22 * eio(p4);
+      ctx.globalAlpha = drillAlpha;
+      // Shank
+      ctx.strokeStyle = '#8a8a8a'; ctx.lineWidth = 1.4; ctx.lineCap = 'butt';
+      ctx.beginPath(); ctx.moveTo(x, tipY - 13); ctx.lineTo(x, tipY - 2.5); ctx.stroke();
+      // Tip chevron
+      ctx.strokeStyle = '#aaaaaa'; ctx.lineWidth = 0.9; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x - 2.2, tipY - 2.5); ctx.lineTo(x, tipY); ctx.lineTo(x + 2.2, tipY - 2.5);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // Sparks (contact) and debris (drilling) — trailing-line style
+    ctx.lineCap = 'round';
+    for (const s of sparks) {
+      const age = f <= s.f0 || f >= s.f1 ? 0 : (f - s.f0) / (s.f1 - s.f0);
+      if (age <= 0) continue;
+      // Fast flash-in, long fade-out
+      const fade = age < 0.25 ? age / 0.25 : 1 - (age - 0.25) / 0.75;
+      const dist  = s.r * age;
+      const isContact = s.f0 < 0.20;
+      // Contact sparks originate from tip impact point at their birth f
+      const oy = isContact ? y - 18 * (1 - s.f0 / 0.20) : y;
+      const sx = x  + Math.cos(s.angle) * dist;
+      const sy = oy + Math.sin(s.angle) * dist;
+      const alpha = (fade * (isContact ? 0.95 : 0.78)).toFixed(2);
+      ctx.strokeStyle = s.col > 0.5
+        ? `rgba(255,242,200,${alpha})`
+        : isContact
+          ? `rgba(255,150,40,${alpha})`
+          : `rgba(210,105,45,${alpha})`;
+      ctx.lineWidth = isContact ? 0.9 : 0.7;
+      ctx.beginPath();
+      // Tail trails behind leading edge
+      ctx.moveTo(sx - Math.cos(s.angle) * s.len, sy - Math.sin(s.angle) * s.len);
+      ctx.lineTo(sx, sy);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  /* ── Soldermask sweep left → right ─────────────────────────────────────── */
+  function drawSoldermask(ctx: CanvasRenderingContext2D, W: number, H: number, f: number, mc: string) {
+    if (f <= 0) return;
+    const sweepX = eio(f) * (W + 10) - 5;
+    const covered = Math.min(sweepX, W);
+    if (covered <= 0) return;
+    ctx.save();
+
+    // Translucent tinted fill — copper traces bleed through at ~0.40 weight
+    ctx.fillStyle = MASK_RGBA[mc] || MASK_RGBA.green;
+    ctx.fillRect(0, 0, covered, H);
+
+    // Lacquer sheen: faint diagonal specular from top-left corner
+    const sheen = ctx.createLinearGradient(0, 0, covered * 0.65, H * 0.55);
+    sheen.addColorStop(0,    'rgba(255,255,255,0.065)');
+    sheen.addColorStop(0.30, 'rgba(255,255,255,0.028)');
+    sheen.addColorStop(0.65, 'rgba(255,255,255,0.008)');
+    sheen.addColorStop(1,    'rgba(255,255,255,0)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(0, 0, covered, H);
+
+    // UV-cured resin leading edge — wider, held vivid at the front
+    if (f < 1 && sweepX > 0 && sweepX < W + 5) {
+      const glow = MASK_GLOW[mc] || MASK_GLOW.green;
+      const ledge = ctx.createLinearGradient(sweepX - 14, 0, sweepX + 6, 0);
+      ledge.addColorStop(0,    'rgba(0,0,0,0)');
+      ledge.addColorStop(0.25, glow);
+      ledge.addColorStop(0.80, glow);
+      ledge.addColorStop(1,    'rgba(0,0,0,0)');
+      ctx.fillStyle = ledge;
+      ctx.fillRect(Math.max(0, sweepX - 14), 0, 20, H);
+    }
+
+    ctx.restore();
+  }
+
+  /* ── SMD component pick-and-place (0402 resistors + tiny ICs) ────────────
+     f 0→1 drives staggered drop-in; reflow glow after f > 0.7.
+  ─────────────────────────────────────────────────────────────────────────*/
+  function drawComponents(ctx: CanvasRenderingContext2D, vias: [number, number][], W: number, H: number, f: number) {
+    if (f <= 0 || !vias.length) return;
+
+    function bounceOut(t: number): number {
+      if (t < 1 / 2.75) return 7.5625 * t * t;
+      if (t < 2 / 2.75) { const u = t - 1.5 / 2.75; return 7.5625 * u * u + 0.75; }
+      if (t < 2.5 / 2.75) { const u = t - 2.25 / 2.75; return 7.5625 * u * u + 0.9375; }
+      const u = t - 2.625 / 2.75; return 7.5625 * u * u + 0.984375;
+    }
+
+    const n = vias.length;
+    const icOffsets: [number, number][] = [[14, -8], [-16, 10], [10, 14]];
+    const icCount = Math.min(3, Math.max(2, n));
+
+    ctx.save();
+
+    // 0402 resistors — one per via, staggered entry
+    for (let i = 0; i < n; i++) {
+      const startF = n > 1 ? (i / (n - 1)) * 0.6 : 0;
+      const localF = Math.max(0, Math.min(1, (f - startF) / 0.35));
+      if (localF <= 0) continue;
+
+      const b = bounceOut(localF);
+      const [vx, vy] = vias[i];
+
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, localF * 3);
+      ctx.translate(vx, vy + (-5 * (1 - b)));
+      ctx.scale(0.4 + 0.6 * b, 0.4 + 0.6 * b);
+
+      // Body
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(-2.5, -1.25, 5, 2.5);
+      // End-cap pads
+      ctx.fillStyle = '#c87941';
+      ctx.fillRect(-2.5, -1.25, 1.5, 2.5); // left cap
+      ctx.fillRect( 1.0, -1.25, 1.5, 2.5); // right cap
+
+      ctx.restore();
+    }
+
+    // Tiny IC packages — derived from first icCount via positions, offset to avoid overlap
+    for (let i = 0; i < icCount; i++) {
+      const viaIdx = Math.min(i, n - 1);
+      const [vx, vy] = vias[viaIdx];
+      const [ox, oy] = icOffsets[i] || [12 + i * 8, 0];
+      const icX = Math.max(8,  Math.min(W - 8,  vx + ox));
+      const icY = Math.max(5,  Math.min(H - 5,  vy + oy));
+
+      // ICs begin arriving after the first resistor wave (f ≈ 0.45)
+      const startF = 0.45 + (i / Math.max(1, icCount - 1)) * 0.20;
+      const localF = Math.max(0, Math.min(1, (f - startF) / 0.35));
+      if (localF <= 0) continue;
+
+      const b = bounceOut(localF);
+
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, localF * 3);
+      ctx.translate(icX, icY + (-5 * (1 - b)));
+      ctx.scale(0.4 + 0.6 * b, 0.4 + 0.6 * b);
+
+      // IC body
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(-4, -2.5, 8, 5);
+
+      // 4 lead lines on each long (8px) side, 1px long, centred, 2px pitch
+      ctx.strokeStyle = '#9a9a9a';
+      ctx.lineWidth = 0.8;
+      for (let li = 0; li < 4; li++) {
+        const lx = -3 + li * 2; // −3, −1, 1, 3
+        ctx.beginPath(); ctx.moveTo(lx, -2.5); ctx.lineTo(lx, -3.5); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(lx,  2.5); ctx.lineTo(lx,  3.5); ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    // Reflow oven shimmer: warm orange radial, sweeps L→R after f > 0.7
+    if (f > 0.7) {
+      const reflowF = (f - 0.7) / 0.3;
+      const sweepX  = eio(reflowF) * (W + 60) - 30;
+
+      for (let i = 0; i < n; i++) {
+        const [vx, vy] = vias[i];
+        const dist = Math.abs(vx - sweepX);
+        if (dist > 28) continue;
+        const gi = (1 - dist / 28) * 0.70;
+        const glw = ctx.createRadialGradient(vx, vy, 0, vx, vy, 10);
+        glw.addColorStop(0,   `rgba(255,140,30,${gi.toFixed(2)})`);
+        glw.addColorStop(0.5, `rgba(255,80,10,${(gi * 0.35).toFixed(2)})`);
+        glw.addColorStop(1,   'rgba(220,50,0,0)');
+        ctx.fillStyle = glw;
+        ctx.beginPath(); ctx.arc(vx, vy, 10, 0, Math.PI * 2); ctx.fill();
+      }
+
+      for (let i = 0; i < icCount; i++) {
+        const viaIdx = Math.min(i, n - 1);
+        const [vx, vy] = vias[viaIdx];
+        const [ox, oy] = icOffsets[i] || [12 + i * 8, 0];
+        const icX = Math.max(8, Math.min(W - 8, vx + ox));
+        const icY = Math.max(5, Math.min(H - 5, vy + oy));
+        const dist = Math.abs(icX - sweepX);
+        if (dist > 35) continue;
+        const gi = (1 - dist / 35) * 0.60;
+        const glw = ctx.createRadialGradient(icX, icY, 0, icX, icY, 14);
+        glw.addColorStop(0,   `rgba(255,140,30,${gi.toFixed(2)})`);
+        glw.addColorStop(0.5, `rgba(255,80,10,${(gi * 0.30).toFixed(2)})`);
+        glw.addColorStop(1,   'rgba(220,50,0,0)');
+        ctx.fillStyle = glw;
+        ctx.beginPath(); ctx.arc(icX, icY, 14, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  /* ── Silkscreen: white outline over soldermask ──────────────────────────── */
+  function drawSilkscreen(
+    ctx: CanvasRenderingContext2D,
+    contour: { x: number; y: number; gap?: true }[],
+    f: number,
+  ) {
+    if (f <= 0 || !contour.length) return;
+    ctx.save();
+    ctx.globalAlpha = f * 0.78;
+    ctx.strokeStyle = '#c8ccb8';
+    ctx.lineWidth = 0.65; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    let moved = false;
+    for (const p of contour) {
+      if (p.gap || !moved) { ctx.moveTo(p.x, p.y); moved = !p.gap; }
+      else { ctx.lineTo(p.x, p.y); }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ── ENIG-plated pads at via positions ──────────────────────────────────── */
+  function drawPads(ctx: CanvasRenderingContext2D, vias: [number, number][], f: number) {
+    if (f <= 0 || !vias.length) return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, f * 1.4);
+    for (const [x, y] of vias) {
+      ctx.fillStyle = '#d6ae72'; // --gold site token
+      ctx.fillRect(x - 2.5, y - 2.5, 5, 5);
+      // Keep drill hole visible
+      ctx.fillStyle = '#060c08';
+      ctx.beginPath(); ctx.arc(x, y, VIA_HOLE - 0.3, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* ── Optional SMD LED glow spots ────────────────────────────────────────── */
+  function drawLEDs(ctx: CanvasRenderingContext2D, leds: [number, number][], f: number) {
+    if (f <= 0 || !leds.length) return;
+    ctx.save();
+    for (const [x, y] of leds) {
+      const glw = ctx.createRadialGradient(x, y, 0, x, y, 10);
+      glw.addColorStop(0,    `rgba(255,215,70,${(0.70*f).toFixed(2)})`);
+      glw.addColorStop(0.4,  `rgba(255,150,20,${(0.28*f).toFixed(2)})`);
+      glw.addColorStop(1,    'rgba(255,100,0,0)');
+      ctx.fillStyle = glw;
+      ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = f;
+      ctx.fillStyle = '#f0ea90';
+      ctx.fillRect(x - 2, y - 1, 4, 2);
+    }
+    ctx.restore();
+  }
+
+  /* ── Main per-element setup ─────────────────────────────────────────────── */
+  function setup(wrap: HTMLElement) {
+    if (nActive >= MAX_ACT) { setTimeout(() => setup(wrap), 300); return; }
+    nActive++;
+
+    const bedEl = wrap.querySelector<HTMLCanvasElement>('.pcb-bed');
+    const fxEl  = wrap.querySelector<HTMLCanvasElement>('.pcb-fx');
+    if (!bedEl || !fxEl) { nActive--; return; }
+
+    const heading = wrap.querySelector<HTMLElement>('h1,h2,h3,h4,h5,h6,[data-pcb]');
+    if (!heading) { nActive--; return; }
+
+    const DUR   = parseFloat(wrap.dataset.pcbDuration || '3.5') * 1000;
+    const DELAY = parseFloat(wrap.dataset.pcbDelay    || '0.25') * 1000;
+    const MC    = wrap.dataset.pcbMask || 'green';
+    const rect = wrap.getBoundingClientRect();
+    const W = Math.floor(rect.width);
+    const H = Math.floor(rect.height);
+    if (W < 40 || H < 8) { nActive--; return; }
+
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const PW  = Math.round(W * DPR);
+    const PH  = Math.round(H * DPR);
+
+    [bedEl, fxEl].forEach(c => {
+      c.width = PW; c.height = PH;
+      c.style.width = W + 'px'; c.style.height = H + 'px';
+    });
+    const bCtx = bedEl.getContext('2d')!;
+    const fCtx = fxEl.getContext('2d')!;
+    bCtx.scale(DPR, DPR); fCtx.scale(DPR, DPR);
+
+    // Static off-screen surfaces
+    const boardOff  = mk(PW, PH);
+    { const c = boardOff.getContext('2d')!; c.scale(DPR, DPR); renderBoard(c, W, H, MC); }
+    const copperOff = mk(PW, PH);
+    { const c = copperOff.getContext('2d')!; c.scale(DPR, DPR); renderCopper(c, W, H); }
+
+    // Accumulation canvas: grows as copper is routed/poured (white = copper present)
+    const accOff = mk(PW, PH);
+    const acCtx  = accOff.getContext('2d')!; acCtx.scale(DPR, DPR);
+
+    // Scratch canvas for destination-in compositing
+    const tmpOff = mk(PW, PH);
+    const tmCtx  = tmpOff.getContext('2d')!; tmCtx.scale(DPR, DPR);
+
+    document.fonts.ready.then(() => {
+      const mpx      = buildMask(wrap, heading, W, H);
+      const contour  = extractContour(mpx, W, H);
+      const qPath    = quantizePath(contour, SNAP);
+      const vias      = genVias(qPath, 20, MAX_VIAS);
+      const viaSparks = vias.map(([vx, vy]) =>
+        genViaSparks(mkRng(((vx * 374761393) ^ (vy * 668265263)) | 0)));
+      // For each via (placed at a path corner), record the adjacent trace endpoints
+      const viaTraceEnds: [number, number][][] = vias.map(([vx, vy]) => {
+        const ends: [number, number][] = [];
+        for (let i = 1; i < qPath.length - 1; i++) {
+          const [cx, cy, gap] = qPath[i];
+          if (gap || Math.abs(cx - vx) > 0.5 || Math.abs(cy - vy) > 0.5) continue;
+          if (!qPath[i - 1][2]) ends.push([qPath[i - 1][0], qPath[i - 1][1]]);
+          if (!qPath[i + 1][2]) ends.push([qPath[i + 1][0], qPath[i + 1][1]]);
+          break;
+        }
+        return ends;
+      });
+      const pourSegs = genPour(mpx, W, H, POUR_PITCH);
+      const pourLen  = pourSegs.reduce((a, [x1,y1,x2,y2]) => a + Math.hypot(x2-x1, y2-y1), 0);
+
+      // Total trace path length (for speed normalisation)
+      let traceLen = 0;
+      for (let i = 1; i < qPath.length; i++) {
+        if (!qPath[i][2] && !qPath[i-1][2])
+          traceLen += Math.hypot(qPath[i][0]-qPath[i-1][0], qPath[i][1]-qPath[i-1][1]);
+      }
+
+      // LED glow: pick up to 2 via positions
+      const leds: [number, number][] = [];
+      if (vias.length > 0) leds.push(vias[Math.floor(vias.length * 0.33)]);
+      if (vias.length > 3) leds.push(vias[Math.floor(vias.length * 0.66)]);
+
+      // Full solid mask for guaranteed complete pour on phase transition
+      const maskFull = mk(PW, PH);
+      { const c = maskFull.getContext('2d')!; c.scale(DPR, DPR);
+        c.fillStyle = '#fff';
+        for (let x = 0; x < W; x++) {
+          let yt = -1, yb = -1;
+          for (let y = 0; y < H; y++) { if (mpx[(y*W+x)*4] > 60) { if(yt<0) yt=y; yb=y; } }
+          if (yt >= 0) c.fillRect(x, yt, 1, yb-yt+1);
+        }
+      }
+
+      /* ── Phase schedule ──────────────────────────────────────────────
+         board  0.00–0.08  FR4 board fades in
+         trace  0.08–0.56  routing head traces glyph outlines (45°/90°)
+         pour   0.56–0.68  copper flood pour fills letter bodies
+         via    0.68–0.76  plated vias punch in (staggered)
+         mask   0.76–0.87  soldermask sweeps left→right
+         finish 0.87–1.00  silkscreen + ENIG pads + LED glow
+      ─────────────────────────────────────────────────────────────────*/
+      const phases = [
+        { name: 'board',  t0: 0.00, t1: 0.08 },
+        { name: 'trace',  t0: 0.08, t1: 0.56 },
+        { name: 'pour',   t0: 0.56, t1: 0.68 },
+        { name: 'via',    t0: 0.68, t1: 0.76 },
+        { name: 'mask',   t0: 0.76, t1: 0.87 },
+        { name: 'finish', t0: 0.87, t1: 1.00 },
+      ];
+      const traceDurSec = (0.56 - 0.08) * DUR / 1000;
+      const pourDurSec  = (0.68 - 0.56) * DUR / 1000;
+
+      // Animation state
+      let phaseIdx   = 0;
+      let qIdx       = 0, qDist  = 0;   // trace routing position
+      let pIdx       = 0, pT     = 0;   // pour position
+      let routeX     = qPath.length ? qPath[0][0] : W/2;
+      let routeY     = qPath.length ? qPath[0][1] : H/2;
+      let maskF      = 0, finishF = 0, fidF = 0;
+      const viaAlphas = new Array<number>(vias.length).fill(0);
+      let viaSnapped = false;
+      let lastTs: number | null = null;
+      let startTs = 0;
+
+      /* ── Composite all PCB layers onto bCtx ──────────────────────────── */
+      function composite() {
+        bCtx.clearRect(0, 0, W, H);
+        // Layer 1 — FR4 board
+        bCtx.drawImage(boardOff, 0, 0, W, H);
+        // Layer 2 — copper texture, masked to accumulated routed area
+        tmCtx.clearRect(0, 0, W, H);
+        tmCtx.drawImage(copperOff, 0, 0, W, H);
+        tmCtx.globalCompositeOperation = 'destination-in';
+        tmCtx.drawImage(accOff, 0, 0, W, H);
+        tmCtx.globalCompositeOperation = 'source-over';
+        bCtx.drawImage(tmpOff, 0, 0, W, H);
+        // Layer 2b — teardrop fillets (copper colour, before soldermask)
+        for (let i = 0; i < vias.length; i++) {
+          const a = viaAlphas[i];
+          if (a <= 0) continue;
+          bCtx.save();
+          bCtx.globalAlpha = Math.min(1, a * 2.5);
+          for (const [tx, ty] of viaTraceEnds[i])
+            drawTeardrop(bCtx, tx, ty, vias[i][0], vias[i][1], TRACE_W, VIA_R);
+          bCtx.restore();
+        }
+        // Layer 2c — thermal relief cuts (board bg colour, before soldermask)
+        if (viaAlphas.some(a => a > 0)) {
+          const bg = BOARD_BG[MC] || BOARD_BG.green;
+          for (const [vx, vy] of vias)
+            drawThermalRelief(bCtx, vx, vy, VIA_R, TRACE_W, bg);
+        }
+        // Layer 3 — soldermask sweep
+        drawSoldermask(bCtx, W, H, maskF, MC);
+        // Layer 4 — vias (pierce soldermask)
+        for (let i = 0; i < vias.length; i++)
+          drawVia(bCtx, vias[i][0], vias[i][1], viaAlphas[i], MC, viaSparks[i]);
+        // Layer 5 — fiducial marks (subtle, over soldermask)
+        drawFiducials(bCtx, W, H, fidF, BOARD_BG[MC] || BOARD_BG.green);
+        // Layer 6 — silkscreen + ENIG pads (finish phase)
+        if (finishF > 0) {
+          drawSilkscreen(bCtx, contour, finishF);
+          drawPads(bCtx, vias, finishF);
+        }
+      }
+
+      /* ── Draw one trace segment on the accumulation canvas ───────────── */
+      function routeTrace(x0: number, y0: number, x1: number, y1: number) {
+        acCtx.save();
+        acCtx.strokeStyle = '#fff'; acCtx.lineWidth = TRACE_W;
+        acCtx.lineCap = 'butt'; acCtx.lineJoin = 'miter';
+        acCtx.beginPath(); acCtx.moveTo(x0, y0); acCtx.lineTo(x1, y1); acCtx.stroke();
+        acCtx.restore();
+      }
+
+      /* ── Deposit a pour spot at (x, y) ──────────────────────────────── */
+      function pourAt(x: number, y: number) {
+        acCtx.save();
+        acCtx.fillStyle = '#fff';
+        acCtx.beginPath(); acCtx.arc(x, y, POUR_PITCH/2 + 0.5, 0, Math.PI*2); acCtx.fill();
+        acCtx.restore();
+      }
+
+      function finalise() {
+        fxEl.style.display = 'none';
+        bedEl.style.transition = 'opacity 0.30s ease';
+        bedEl.style.opacity = '0';
+        heading.style.visibility = 'visible';
+        setTimeout(() => { bedEl.style.display = 'none'; nActive--; }, 340);
+      }
+
+      function showDone() {
+        bedEl.style.display = 'none'; fxEl.style.display = 'none';
+        heading.style.visibility = 'visible'; nActive--;
+      }
+
+      if (REDUCED) { showDone(); return; }
+
+      heading.style.visibility = 'hidden';
+      bCtx.drawImage(boardOff, 0, 0, W, H);   // show board immediately
+
+      function frame(ts: number) {
+        if (!lastTs) lastTs = ts;
+        const dt  = Math.min((ts - lastTs) / 1000, 0.05);
+        lastTs = ts;
+        const pct = Math.min((ts - startTs) / DUR, 1.0);
+        fidF = eio(Math.min(1, pct / 0.08));
+        const routingAge = Math.max(0, (pct - 0.08) * DUR / 1000);
+
+        while (phaseIdx < phases.length - 1 && pct >= phases[phaseIdx].t1) phaseIdx++;
+        const ph = phases[phaseIdx];
+        const pt = ph.t1 > ph.t0 ? Math.min(1, (pct - ph.t0) / (ph.t1 - ph.t0)) : 1;
+
+        // On first frame of via phase: snap full copper pour to guarantee complete fill
+        if (ph.name === 'via' && !viaSnapped) {
+          acCtx.drawImage(maskFull, 0, 0, W, H);
+          viaSnapped = true;
+        }
+
+        fCtx.clearRect(0, 0, W, H);
+
+        /* ── BOARD SETTLE ───────────────────────────────────────────────── */
+        if (ph.name === 'board') {
+          bCtx.clearRect(0, 0, W, H);
+          bCtx.globalAlpha = eio(pt);
+          bCtx.drawImage(boardOff, 0, 0, W, H);
+          bCtx.globalAlpha = 1;
+          drawFiducials(bCtx, W, H, fidF, BOARD_BG[MC] || BOARD_BG.green);
+
+        /* ── TRACE ROUTING (45°/90° PCB routing head) ───────────────────── */
+        } else if (ph.name === 'trace') {
+          if (qPath.length > 1 && traceLen > 0.1) {
+            const spd = traceLen / traceDurSec;
+            let rem = spd * dt;
+            while (rem > 0 && qIdx < qPath.length - 1) {
+              const [x0, y0]      = qPath[qIdx];
+              const [x1, y1, g1]  = qPath[qIdx + 1];
+              // Gap = lift and teleport to new sub-path start
+              if (g1) { qIdx++; routeX = x1; routeY = y1; continue; }
+              const segLen = Math.hypot(x1-x0, y1-y0);
+              if (segLen < 0.01) { qIdx++; continue; }
+              const startFrac = qDist / segLen;
+              const remaining = (1 - startFrac) * segLen;
+              if (rem >= remaining) {
+                routeTrace(x0+(x1-x0)*startFrac, y0+(y1-y0)*startFrac, x1, y1);
+                routeX = x1; routeY = y1;
+                rem -= remaining; qDist = 0; qIdx++;
+              } else {
+                const endFrac = (qDist + rem) / segLen;
+                routeTrace(
+                  x0 + (x1-x0)*startFrac, y0 + (y1-y0)*startFrac,
+                  x0 + (x1-x0)*endFrac,   y0 + (y1-y0)*endFrac,
+                );
+                routeX = x0 + (x1-x0)*endFrac;
+                routeY = y0 + (y1-y0)*endFrac;
+                qDist += rem; rem = 0;
+              }
+            }
+          }
+          composite();
+          drawRoutingHead(fCtx, routeX, routeY, routingAge, W, H);
+
+        /* ── COPPER POUR (flood fill scan lines) ────────────────────────── */
+        } else if (ph.name === 'pour') {
+          if (pIdx < pourSegs.length && pourLen > 0.1) {
+            const spd = pourLen / pourDurSec;
+            let rem = spd * dt;
+            while (rem > 0 && pIdx < pourSegs.length) {
+              const [sx, sy, ex, ey] = pourSegs[pIdx];
+              const slen = Math.hypot(ex-sx, ey-sy);
+              if (slen < 0.01) { pIdx++; continue; }
+              const toEnd = (1 - pT) * slen;
+              if (rem >= toEnd) {
+                pourAt(ex, ey); routeX = ex; routeY = ey;
+                rem -= toEnd; pT = 0; pIdx++;
+              } else {
+                pT += rem / slen;
+                const nx = sx + (ex-sx)*pT, ny = sy + (ey-sy)*pT;
+                pourAt(nx, ny); routeX = nx; routeY = ny;
+                rem = 0;
+              }
+            }
+          }
+          composite();
+          drawRoutingHead(fCtx, routeX, routeY, routingAge, W, H);
+
+        /* ── VIAS PUNCH IN (staggered, with scale animation) ─────────────── */
+        } else if (ph.name === 'via') {
+          for (let i = 0; i < vias.length; i++) {
+            const startAt = vias.length > 1 ? (i / (vias.length - 1)) * 0.5 : 0;
+            viaAlphas[i] = Math.max(0, Math.min(1, (pt - startAt) / 0.5));
+          }
+          composite();
+
+        /* ── SOLDERMASK SWEEP (left → right) ─────────────────────────────── */
+        } else if (ph.name === 'mask') {
+          maskF = pt;
+          viaAlphas.fill(1);
+          composite();
+
+        /* ── FINISH: silkscreen + ENIG pads + components + LED glow ─────── */
+        } else if (ph.name === 'finish') {
+          maskF = 1; viaAlphas.fill(1); finishF = pt;
+          composite();
+          drawComponents(bCtx, vias, W, H, pt);
+          drawLEDs(fCtx, leds, eio(Math.min(1, pt * 2.5)));
+          if (pt >= 1) { finalise(); return; }
+        }
+
+        requestAnimationFrame(frame);
+      }
+
+      setTimeout(() => { startTs = performance.now(); requestAnimationFrame(frame); }, DELAY);
+    });
+  }
+
+  /* ── Observer / page init ──────────────────────────────────────────────── */
+  function init() {
+    document.querySelectorAll<HTMLElement>('.pcb-wrap').forEach(wrap => {
+      if (REDUCED) {
+        const h = wrap.querySelector<HTMLElement>('h1,h2,h3,h4,h5,h6');
+        if (h) h.style.visibility = 'visible';
+        return;
+      }
+      const trig = wrap.dataset.pcbTrigger || 'scroll';
+      if (trig === 'scroll' && 'IntersectionObserver' in window) {
+        const obs = new IntersectionObserver(entries => {
+          entries.forEach(e => {
+            if (e.isIntersecting) {
+              obs.unobserve(e.target as HTMLElement);
+              setup(e.target as HTMLElement);
+            }
+          });
+        }, { threshold: 0.12, rootMargin: '0px 0px -20px 0px' });
+        obs.observe(wrap);
+      } else {
+        setup(wrap);
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>

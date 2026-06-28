@@ -1,0 +1,134 @@
+---
+// Generative strut-lattice background.
+// Animated when JS is available; static single-draw when prefers-reduced-motion.
+// Caller must give the parent element position:relative and overflow:hidden.
+---
+
+<canvas class="lattice" aria-hidden="true"></canvas>
+
+<script>
+  const SPACING    = 64;   // grid cell size (px)
+  const DRIFT_R    = 3.5;  // max drift radius from home position
+  const DRIFT_SPD  = 0.005; // radians per frame
+  const STROKE     = 'rgba(35, 38, 44, 0.95)'; // --panel-edge
+  const DOT        = 'rgba(35, 38, 44, 0.70)';
+
+  type Node = { hx: number; hy: number; x: number; y: number; a: number };
+
+  function buildLattice(W: number, H: number) {
+    const cols = Math.ceil(W / SPACING) + 2;
+    const rows = Math.ceil(H / (SPACING * 0.86)) + 2;
+    const nodes: Node[] = [];
+    const edges: [number, number][] = [];
+    const idx = (c: number, r: number) => r * (cols + 1) + c;
+
+    for (let r = 0; r <= rows; r++) {
+      for (let c = 0; c <= cols; c++) {
+        const hexOff = (r % 2) * (SPACING * 0.5);
+        nodes.push({
+          hx: c * SPACING + hexOff - SPACING,
+          hy: r * SPACING * 0.86  - SPACING,
+          x: 0, y: 0,
+          a: Math.random() * Math.PI * 2,
+        });
+      }
+    }
+
+    // Triangulate: right, down, both diagonals
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c <= cols; c++) {
+        const i = idx(c, r);
+        if (c < cols) edges.push([i, idx(c + 1, r)]);
+        edges.push([i, idx(c, r + 1)]);
+        if (c < cols) edges.push([i, idx(c + 1, r + 1)]);
+        if (c > 0)    edges.push([i, idx(c - 1, r + 1)]);
+      }
+    }
+
+    return { nodes, edges };
+  }
+
+  function seedPositions(nodes: Node[]) {
+    for (const n of nodes) {
+      n.x = n.hx + Math.cos(n.a) * DRIFT_R;
+      n.y = n.hy + Math.sin(n.a) * DRIFT_R;
+    }
+  }
+
+  function render(
+    ctx: CanvasRenderingContext2D,
+    W: number, H: number,
+    nodes: Node[],
+    edges: [number, number][],
+  ) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.lineWidth = 0.7;
+    ctx.strokeStyle = STROKE;
+    ctx.fillStyle   = DOT;
+
+    for (const [ai, bi] of edges) {
+      const a = nodes[ai], b = nodes[bi];
+      if (!a || !b) continue;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    for (const n of nodes) {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  document.querySelectorAll<HTMLCanvasElement>('canvas.lattice').forEach(canvas => {
+    const ctx = canvas.getContext('2d')!;
+    let raf = 0;
+    let nodes: Node[] = [];
+    let edges: [number, number][] = [];
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function init() {
+      canvas.width  = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      ({ nodes, edges } = buildLattice(canvas.width, canvas.height));
+      seedPositions(nodes);
+    }
+
+    function tick() {
+      for (const n of nodes) {
+        n.a += DRIFT_SPD;
+        n.x = n.hx + Math.cos(n.a) * DRIFT_R;
+        n.y = n.hy + Math.sin(n.a) * DRIFT_R;
+      }
+      render(ctx, canvas.width, canvas.height, nodes, edges);
+      raf = requestAnimationFrame(tick);
+    }
+
+    function start() {
+      init();
+      cancelAnimationFrame(raf);
+      if (reduced) {
+        render(ctx, canvas.width, canvas.height, nodes, edges);
+      } else {
+        tick();
+      }
+    }
+
+    new ResizeObserver(() => { cancelAnimationFrame(raf); start(); }).observe(canvas);
+    start();
+  });
+</script>
+
+<style>
+  .lattice {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+</style>
