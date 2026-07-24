@@ -1,0 +1,574 @@
+---
+import ProjectLayout from '@/layouts/ProjectLayout.astro';
+import Bolt from '@/components/Bolt.astro';
+---
+
+<ProjectLayout
+  title="The Card"
+  subtitle="Design &amp; Fabrication"
+  role="Designer &amp; Fabricator"
+  year="2025"
+  tags={[
+    'CNC Machining',
+    'Metalwork',
+    'Anodizing',
+    'NFC',
+    'Industrial Design',
+    'Branding',
+  ]}
+  overview="A precision-machined metal business card — anodized aluminum, a CNC-machined strut lattice, an engraved nameplate, and a copper QR inlay with an embedded NFC chip. Tap it or scan it and it opens this site. The card is the object; this website is its digital twin."
+  specs={[
+    { key: 'Body material',   value: 'Aluminum' },
+    { key: 'Finish',          value: 'Anodized' },
+    { key: 'Lattice',         value: 'CNC' },
+    { key: 'QR inlay',        value: 'Copper' },
+    { key: 'Digital link',    value: 'NFC + QR' },
+    { key: 'Destination',     value: 'This site' },
+  ]}
+  prevProject={{ title: 'From Crude to Extrude', href: '/research/from-crude-to-extrude' }}
+  description="The machined metal business card by Benjamin Davis — anodized aluminum, CNC-machined lattice, engraved nameplate, and a copper QR inlay with embedded NFC that opens this website. The physical object this site is modeled on."
+>
+
+  <!-- ── The Object ─────────────────────────────────────────────────────── -->
+  <section class="proj-section">
+    <div class="container">
+      <p class="overline">The Object</p>
+      <h2 class="section-h2">A business card you can't fold</h2>
+
+      <div class="two-col">
+        <div>
+          <p class="body-text">
+            A paper business card says what you do. A machined metal one shows it.
+            This card is a small manufacturing portfolio you can hold — every surface
+            is a decision about material, tolerance, and finish, made deliberately and
+            executed on real equipment.
+          </p>
+          <p class="body-text">
+            The face carries the nameplate — <span class="gold">Benjamin Davis</span>,
+            Advanced Manufacturing — engraved into anodized aluminum and framed by a
+            geometric strut lattice with recessed corner screws. The reverse holds a
+            copper QR inlay set into the same lattice. Behind it sits an embedded NFC
+            chip.
+          </p>
+          <p class="body-text">
+            Tap the card to a phone or point a camera at the QR, and it resolves to this
+            website. The handoff from a physical object to a digital one is the whole
+            point: the card is the invitation, the site is the room it opens into.
+          </p>
+        </div>
+
+        <div class="problem-stats">
+          <div class="stat-item">
+            <span class="stat-val">Metal</span>
+            <span class="stat-key">Anodized aluminum body, not paper or plastic</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val">Tap</span>
+            <span class="stat-key">Embedded NFC — phone-first, no app required</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val">Scan</span>
+            <span class="stat-key">Copper QR inlay as a visible fallback</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Front & Back ───────────────────────────────────────────────────── -->
+  <section class="proj-section proj-section--dark">
+    <div class="container">
+      <p class="overline">Two Faces</p>
+      <h2 class="section-h2">Front and back</h2>
+
+      <div class="faces-grid">
+        <div class="img-frame">
+          <img
+            src="/images/card-front.webp"
+            alt="Front of the machined metal business card — engraved 'Benjamin Davis, Advanced Manufacturing' nameplate framed by a geometric strut lattice with recessed corner screws"
+            width="1024"
+            height="559"
+            loading="lazy"
+            decoding="async"
+          />
+          <Bolt position="tl" size={14} />
+          <Bolt position="tr" size={14} />
+          <span class="img-caption">Front &middot; engraved nameplate &amp; strut lattice</span>
+        </div>
+
+        <div class="img-frame">
+          <img
+            src="/images/card-back.webp"
+            alt="Back of the machined metal business card — copper QR code inlay set into the same geometric lattice frame"
+            width="1024"
+            height="559"
+            loading="lazy"
+            decoding="async"
+          />
+          <Bolt position="bl" size={14} />
+          <Bolt position="br" size={14} />
+          <span class="img-caption">Back &middot; copper QR inlay &amp; embedded NFC</span>
+        </div>
+      </div>
+
+      <p class="body-text faces-note">
+        The two faces share one design language: the same lattice frame, the same
+        layered ridged edge, the same copper-and-gold palette on anodized black. Nothing
+        on the card is decorative for its own sake — every element earns its place by
+        pointing at what the card is made to do.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Anatomy ────────────────────────────────────────────────────────── -->
+  <section class="proj-section">
+    <div class="container">
+      <p class="overline">Anatomy</p>
+      <h2 class="section-h2">Five deliberate details</h2>
+
+      <div class="anatomy-grid" role="table" aria-label="Card design elements">
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Nameplate</span>
+          <span class="spec-val" role="cell">
+            Engraved into the anodized face — name and discipline in a heavy condensed
+            face, sitting flush with the metal rather than printed on top of it.
+          </span>
+        </div>
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Lattice</span>
+          <span class="spec-val" role="cell">
+            A CNC-machined triangulated strut frame that borders both faces — the same
+            structure this site redraws as its animated background.
+          </span>
+        </div>
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Corner screws</span>
+          <span class="spec-val" role="cell">
+            Four recessed fasteners at the corners, treating the card like an assembled
+            part instead of a single cut blank — echoed by the bolts framing this page.
+          </span>
+        </div>
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">Copper QR</span>
+          <span class="spec-val" role="cell">
+            A QR code rendered as a copper inlay against the dark body — a working scan
+            target that is also the card's single warm accent.
+          </span>
+        </div>
+        <div class="spec-row" role="row">
+          <span class="spec-key" role="rowheader">NFC chip</span>
+          <span class="spec-val" role="cell">
+            Embedded behind the back face, programmed to open this site on tap — the
+            invisible half of the card's dual digital link.
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Fabrication ────────────────────────────────────────────────────── -->
+  <section class="proj-section proj-section--dark">
+    <div class="container">
+      <p class="overline">Fabrication</p>
+      <h2 class="section-h2">From CAD to a part in your hand</h2>
+
+      <div class="fab-grid">
+        <div class="fab-text">
+          <p class="body-text">
+            The card was designed the same way as every other project here: modeled in
+            CAD, then made real on the machines. Turning a flat drawing into an anodized
+            metal object is a sequence of operations, each of which has to land within
+            tolerance before the next one can start.
+          </p>
+          <p class="body-text">
+            The stages below describe how a card like this comes together, from stock to
+            finished part. Macro photography of each step will be added as it's shot.
+          </p>
+        </div>
+
+        <ol class="build-log" aria-label="Fabrication sequence">
+          <li>
+            <span class="build-step">Model the card, lattice, and nameplate in CAD.</span>
+          </li>
+          <li>
+            <span class="build-step">Machine the aluminum blank to size and square the edges.</span>
+          </li>
+          <li>
+            <span class="build-step">CNC the strut lattice and layered ridged border.</span>
+          </li>
+          <li>
+            <span class="build-step">Engrave the nameplate and QR geometry into the face.</span>
+          </li>
+          <li>
+            <span class="build-step">Anodize the body to its dark finish.</span>
+          </li>
+          <li>
+            <span class="build-step">Set the copper QR inlay and fit the corner screws.</span>
+          </li>
+          <li>
+            <span class="build-step">Embed and program the NFC chip to this site's URL.</span>
+          </li>
+          <li>
+            <span class="build-step">Clean, inspect, and verify tap-and-scan behavior.</span>
+          </li>
+        </ol>
+      </div>
+
+      <!-- Placeholder: fabrication macro shots -->
+      <figure
+        class="diagram-placeholder"
+        style="margin-top:2rem;"
+        data-label="[Photos: fabrication macro shots — machining, engraving, anodizing, copper inlay · drop in when shot]"
+        aria-label="Fabrication photo placeholder"
+      >
+        <figcaption>Fabrication sequence photos &mdash; to be added</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ── Digital Twin ───────────────────────────────────────────────────── -->
+  <section class="proj-section">
+    <div class="container">
+      <p class="overline">Digital Twin</p>
+      <h2 class="section-h2">The card became this website</h2>
+
+      <div class="two-col">
+        <div>
+          <p class="body-text">
+            When the card resolves to this site, the visual language shouldn't break.
+            So the site is built as a digital twin of the object: the strut lattice
+            drifts as an animated canvas behind the headings, the corner screws reappear
+            as recessed bolts on every hero panel, and the palette is pulled straight
+            off the metal — anodized graphite, engraved gold, copper accent.
+          </p>
+          <p class="body-text">
+            Even the type follows the card. The headings use the same heavy condensed
+            face as the engraved nameplate; the labels and specs are set in a monospace
+            that reads like a part drawing. The goal is that tapping the card and landing
+            here feels like turning the object over, not clicking a link.
+          </p>
+          <p class="body-text">
+            Every heading on this site is revealed with a manufacturing animation — CNC
+            milling, SLS sintering, anodizing, laser cutting — because the medium is the
+            message. The card says what Benjamin builds by being built that way, and the
+            site continues the sentence.
+          </p>
+        </div>
+
+        <div class="twin-table" role="table" aria-label="Card element mapped to site element">
+          <p class="sub-table-header">Object &rarr; Interface</p>
+          <div class="spec-row" role="row">
+            <span class="spec-key" role="rowheader">Lattice</span>
+            <span class="spec-val" role="cell">Animated canvas strut-lattice background</span>
+          </div>
+          <div class="spec-row" role="row">
+            <span class="spec-key" role="rowheader">Screws</span>
+            <span class="spec-val" role="cell">Recessed corner bolts on hero panels</span>
+          </div>
+          <div class="spec-row" role="row">
+            <span class="spec-key" role="rowheader">Anodize</span>
+            <span class="spec-val" role="cell">Graphite / copper / gold color system</span>
+          </div>
+          <div class="spec-row" role="row">
+            <span class="spec-key" role="rowheader">Engraving</span>
+            <span class="spec-val" role="cell">Condensed headings, monospace spec labels</span>
+          </div>
+          <div class="spec-row" role="row">
+            <span class="spec-key" role="rowheader">Making</span>
+            <span class="spec-val" role="cell">Manufacturing-process heading animations</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="twin-cta">
+        <a href="/research" class="cta-link">&larr; Back to all projects</a>
+        <a href="/contact" class="cta-link cta-link--accent">Get in touch &rarr;</a>
+      </div>
+    </div>
+  </section>
+
+</ProjectLayout>
+
+<style>
+  /* ── Section wrappers ────────────────────────────────────────────────────── */
+  .proj-section {
+    padding-block: 4.5rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .proj-section--dark {
+    background: var(--panel);
+  }
+
+  .overline {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+    margin-bottom: 0.4rem;
+  }
+
+  .section-h2 {
+    font-family: var(--font-head);
+    font-size: clamp(1.6rem, 5vw, 2.6rem);
+    font-weight: 900;
+    color: var(--text);
+    margin-bottom: 2rem;
+    line-height: 1.05;
+  }
+
+  .body-text {
+    font-size: 0.95rem;
+    line-height: 1.78;
+    color: var(--text);
+    margin-bottom: 1.1rem;
+  }
+  .body-text:last-child { margin-bottom: 0; }
+
+  .gold { color: var(--gold); }
+
+  /* ── Shared spec rows ────────────────────────────────────────────────────── */
+  .spec-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .spec-row:last-child { border-bottom: none; }
+
+  .spec-key {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--copper);
+    padding: 0.7rem 0.75rem;
+    border-right: 1px solid var(--panel-edge);
+    display: flex;
+    align-items: flex-start;
+    background: color-mix(in srgb, var(--graphite) 40%, var(--panel));
+  }
+
+  .spec-val {
+    font-size: 0.82rem;
+    color: var(--text);
+    padding: 0.7rem 0.85rem;
+    line-height: 1.55;
+    display: flex;
+    align-items: flex-start;
+  }
+
+  /* ── Image frame ─────────────────────────────────────────────────────────── */
+  .img-frame {
+    position: relative;
+    border: 1px solid var(--panel-edge);
+    overflow: hidden;
+  }
+
+  .img-frame img {
+    width: 100%;
+    display: block;
+    object-fit: cover;
+    filter: brightness(0.9) contrast(1.05);
+  }
+
+  .img-caption {
+    display: block;
+    padding: 0.3rem 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+    background: color-mix(in srgb, var(--graphite) 90%, transparent);
+    border-top: 1px solid var(--panel-edge);
+  }
+
+  /* ── Diagram / photo placeholders ────────────────────────────────────────── */
+  .diagram-placeholder {
+    border: 1px dashed var(--panel-edge);
+    padding: 3rem 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: var(--panel);
+  }
+
+  .diagram-placeholder::before {
+    content: attr(data-label);
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    color: var(--steel);
+    opacity: 0.55;
+    text-align: center;
+  }
+
+  .diagram-placeholder figcaption {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--panel-edge);
+    font-style: italic;
+  }
+
+  /* ── Two-column layout ───────────────────────────────────────────────────── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    gap: 3rem;
+    align-items: start;
+  }
+
+  .problem-stats {
+    border: 1px solid var(--panel-edge);
+    overflow: hidden;
+  }
+
+  .stat-item {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .stat-item:last-child { border-bottom: none; }
+
+  .stat-val {
+    font-family: var(--font-head);
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: var(--gold);
+    line-height: 1;
+  }
+
+  .stat-key {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--steel);
+    line-height: 1.4;
+  }
+
+  @media (max-width: 680px) {
+    .two-col { grid-template-columns: 1fr; gap: 2rem; }
+  }
+
+  /* ── Two faces ───────────────────────────────────────────────────────────── */
+  .faces-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .faces-note {
+    max-width: 680px;
+    margin-top: 2rem;
+    color: var(--steel);
+  }
+
+  @media (max-width: 640px) {
+    .faces-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Anatomy ─────────────────────────────────────────────────────────────── */
+  .anatomy-grid {
+    border: 1px solid var(--panel-edge);
+    max-width: 760px;
+  }
+
+  /* ── Fabrication ─────────────────────────────────────────────────────────── */
+  .fab-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+
+  .build-log {
+    list-style: none;
+    counter-reset: build;
+    border: 1px solid var(--panel-edge);
+    padding: 0;
+    margin: 0;
+  }
+
+  .build-log li {
+    counter-increment: build;
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    align-items: center;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .build-log li:last-child { border-bottom: none; }
+
+  .build-log li::before {
+    content: counter(build, decimal-leading-zero);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--copper);
+    text-align: center;
+    padding: 0.75rem 0;
+    border-right: 1px solid var(--panel-edge);
+    background: color-mix(in srgb, var(--graphite) 40%, var(--panel));
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .build-step {
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--text);
+    padding: 0.6rem 0.85rem;
+  }
+
+  @media (max-width: 680px) {
+    .fab-grid { grid-template-columns: 1fr; gap: 1.75rem; }
+  }
+
+  /* ── Digital twin ────────────────────────────────────────────────────────── */
+  .twin-table {
+    border: 1px solid var(--panel-edge);
+    align-self: start;
+  }
+
+  .sub-table-header {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--copper);
+    padding: 0.5rem 0.75rem;
+    background: color-mix(in srgb, var(--graphite) 80%, var(--panel));
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .twin-cta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--panel-edge);
+  }
+
+  .cta-link {
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .cta-link:hover { color: var(--gold); }
+  .cta-link--accent { color: var(--copper); }
+  .cta-link--accent:hover { color: var(--gold-bright); }
+</style>
