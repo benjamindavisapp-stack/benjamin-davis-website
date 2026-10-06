@@ -1,6 +1,7 @@
 ---
 // CncMill.astro — Brass relief-machined nameplate animation.
-// Three-pass CNC: raster roughing (R1) → semi-finish raster (R2) → contour+counter finishing (R4).
+// Three-pass CNC, all contour-ring toolpaths offset from the real letter
+// silhouette: bulk roughing (R1) → semi-finish (R2) → profile finishing (R4).
 // Letters are left standing (raised); endmill clears the surrounding field.
 ---
 
@@ -115,20 +116,6 @@
     brCtx.scale(DPR, DPR);
     renderBrass(brCtx, W, H);
 
-    /* ── Pre-render: machined field texture (roughing pass, tool R1) ──────── */
-    const fieldOff = mkCanvas(PW, PH);
-    const fiCtx    = fieldOff.getContext('2d')!;
-    fiCtx.scale(DPR, DPR);
-    renderField(fiCtx, W, H, R1, R1);
-
-    /* ── Pre-render: finer field texture left by the semi-finish pass ─────── */
-    // Same model, smaller tool + tighter stepover (R2) — a real, visibly
-    // finer witness-mark pattern, revealed only where pass 2 actually ran.
-    const fieldOff2 = mkCanvas(PW, PH);
-    const fiCtx2    = fieldOff2.getContext('2d')!;
-    fiCtx2.scale(DPR, DPR);
-    renderField(fiCtx2, W, H, R2, R2);
-
     /* ── Pre-render: letter mask (transparent bg, white letters) ─────────── */
     const maskOff = mkCanvas(PW, PH);
     const mCtx    = maskOff.getContext('2d')!;
@@ -139,54 +126,6 @@
     mCtx.fillStyle = '#fff';
     mCtx.fillText('BENJAMIN', W / 2, L1Y);
     mCtx.fillText('DAVIS',    W / 2, L2Y);
-
-    /* ── Pre-render: drop shadow shape ───────────────────────────────────── */
-    // Dark fill masked to offset-text shape, minus the letter body itself
-    const shadowOff = mkCanvas(PW, PH);
-    const shCtx     = shadowOff.getContext('2d')!;
-    shCtx.scale(DPR, DPR);
-    shCtx.fillStyle = 'rgba(0,0,0,0.68)';
-    shCtx.fillRect(0, 0, W, H);
-    shCtx.globalCompositeOperation = 'destination-in';
-    shCtx.font = FONT; shCtx.textAlign = 'center'; shCtx.textBaseline = 'alphabetic';
-    shCtx.fillStyle = '#fff';
-    shCtx.fillText('BENJAMIN', W / 2 + SHX, L1Y + SHY);
-    shCtx.fillText('DAVIS',    W / 2 + SHX, L2Y + SHY);
-    shCtx.globalCompositeOperation = 'destination-out';
-    shCtx.fillText('BENJAMIN', W / 2, L1Y);
-    shCtx.fillText('DAVIS',    W / 2, L2Y);
-    shCtx.globalCompositeOperation = 'source-over';
-
-    /* ── Cut accumulation map (grows each frame) ─────────────────────────── */
-    const cutOff = mkCanvas(PW, PH);
-    const cuCtx  = cutOff.getContext('2d')!;
-    cuCtx.scale(DPR, DPR);
-
-    /* ── Fine-pass accumulation map — only pass 2's own travel marks this ── */
-    const cut2Off = mkCanvas(PW, PH);
-    const cu2Ctx  = cut2Off.getContext('2d')!;
-    cu2Ctx.scale(DPR, DPR);
-
-    /* ── Near-pass reveal map (same strokes, no letter exclusion) ────────── */
-    // Round stroke caps bleed into letter edges — letters emerge as tool passes
-    const nearOff = mkCanvas(PW, PH);
-    const neCtx   = nearOff.getContext('2d')!;
-    neCtx.scale(DPR, DPR);
-
-    /* ── Settled chip surface ────────────────────────────────────────────── */
-    const settledOff = mkCanvas(PW, PH);
-    const seCtx      = settledOff.getContext('2d')!;
-    seCtx.scale(DPR, DPR);
-
-    /* ── Chips that settled on raised letter faces ───────────────────────── */
-    const letterChipsOff = mkCanvas(PW, PH);
-    const lcCtx          = letterChipsOff.getContext('2d')!;
-    lcCtx.scale(DPR, DPR);
-
-    /* ── Compositing scratch pad ─────────────────────────────────────────── */
-    const tmpOff = mkCanvas(PW, PH);
-    const tmCtx  = tmpOff.getContext('2d')!;
-    tmCtx.scale(DPR, DPR);
 
     /* ── Pixel sample canvas for inLetter queries ────────────────────────── */
     const sampC   = mkCanvas(W, H);
@@ -203,102 +142,19 @@
       return mpx[(yi * W + xi) * 4] > 60;
     }
 
-    /* ── Extract letter silhouettes (per-column top/bottom pixel) ────────── */
-    function extractSil(yLo: number, yHi: number) {
-      const y0 = Math.max(0, Math.floor(yLo));
-      const y1 = Math.min(H - 1, Math.ceil(yHi));
-      const cols: { x: number; yt: number; yb: number }[] = [];
-      for (let x = 0; x < W; x++) {
-        let yt = -1, yb = -1;
-        for (let y = y0; y <= y1; y++) {
-          if (mpx[(y * W + x) * 4] > 60) { if (yt < 0) yt = y; yb = y; }
-        }
-        if (yt >= 0) cols.push({ x, yt, yb });
-      }
-      return cols;
-    }
-
     /* ── Path point type ─────────────────────────────────────────────────── */
     interface RPt { x: number; y: number; isGap?: boolean; }
 
-    /* ── Danger maps: 1 = tool centre would contact a letter pixel ───────── */
-    function buildDangerMap(r: number): Uint8Array {
-      const dm = new Uint8Array(W * H);
-      const ir = Math.ceil(r);
-      for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-          if (mpx[(y * W + x) * 4] <= 60) continue;
-          for (let dy2 = -ir; dy2 <= ir; dy2++) {
-            const ny = y + dy2; if (ny < 0 || ny >= H) continue;
-            for (let dx2 = -ir; dx2 <= ir; dx2++) {
-              if (dx2 * dx2 + dy2 * dy2 > r * r) continue;
-              const nx = x + dx2; if (nx < 0 || nx >= W) continue;
-              dm[ny * W + nx] = 1;
-            }
-          }
-        }
-      }
-      return dm;
-    }
-
-    const dmR1 = buildDangerMap(R1);
-    const dmR2 = buildDangerMap(R2);
-
-    /* ── Raster path: bidirectional zigzag scan ──────────────────────────── */
-    function buildRasterPath(
-      toolR: number, stepover: number, dm: Uint8Array,
-      yLo = toolR, yHi = H - toolR
-    ): RPt[] {
-      const path: RPt[] = [];
-      let rightward = true;
-      const margin = Math.ceil(toolR);
-      for (let iy = yLo; iy <= yHi; iy += stepover) {
-        const yi = Math.min(H - 1, Math.max(0, Math.round(iy)));
-        const segs: { x0: number; x1: number }[] = [];
-        let segStart = -1;
-        for (let x = margin; x <= W - margin; x++) {
-          const safe = dm[yi * W + x] === 0;
-          if (safe && segStart < 0) { segStart = x; }
-          else if (!safe && segStart >= 0) { segs.push({ x0: segStart, x1: x - 1 }); segStart = -1; }
-        }
-        if (segStart >= 0) segs.push({ x0: segStart, x1: W - margin });
-        if (rightward) {
-          for (const s of segs) { path.push({ x: s.x0, y: iy, isGap: true }); path.push({ x: s.x1, y: iy }); }
-        } else {
-          for (const s of [...segs].reverse()) { path.push({ x: s.x1, y: iy, isGap: true }); path.push({ x: s.x0, y: iy }); }
-        }
-        rightward = !rightward;
-      }
-      return path;
-    }
-
-    /* ── Letter silhouettes + y extents for pass 2 targeting ────────────── */
-    const sil1 = extractSil(L1Y - capH - 4, L1Y + 3);
-    const sil2 = extractSil(L2Y - capH - 4, L2Y + 3);
-    let lyMin = H, lyMax = 0;
-    for (const c of [...sil1, ...sil2]) {
-      if (c.yt < lyMin) lyMin = c.yt;
-      if (c.yb > lyMax) lyMax = c.yb;
-    }
-
-    // Pass 1: full-width raster at stepover R1
-    const rasterPath1 = buildRasterPath(R1, R1, dmR1);
-    // Pass 2: semi-finish raster limited to letter y-band, stepover R2
-    const rasterPath2 = buildRasterPath(R2, R2, dmR2,
-      Math.max(R2, lyMin - R1 * 2),
-      Math.min(H - R2, lyMax + R1 * 2));
-
-    /* ── Finishing contour: trace the true letter outlines ────────────────
-       Real relief-engraving finishing doesn't sweep a bounding envelope —
-       it hugs the actual glyph silhouette, including every curve, serif,
-       and enclosed counter (the bowls of B/D, the triangle of A…). We get
-       that by building a distance-from-ink field over the whole canvas,
-       then tracing its isocontour at exactly one tool-radius-plus-clearance
-       out. That single isocontour is, automatically, both the outer offset
-       around every glyph AND the inward offset inside every enclosed hole
-       (distance-to-ink increases away from the letter on both sides of its
-       wall), so one pass of this produces a correct finishing path for the
-       whole nameplate — no separate "outer" vs "counter" logic needed. */
+    /* ── Distance-from-ink field + isocontour extraction ────────────────────
+       Every toolpath below — roughing, semi-finish, and finishing alike —
+       is built the same way: offset contours of the distance-to-nearest-ink
+       field, at each pass's own stepover, stepping inward from "far away"
+       down to that pass's target clearance. That's what makes every pass
+       actually trace the letterforms (concentric rings tightening around
+       each glyph as the tool closes in) instead of a raster sweep that's
+       merely blind to their shape. The same field drives the witness-mark
+       texture below too, so the visible toolmarks always match the motion
+       that actually produced them. */
     function distanceFromInk(): Float32Array {
       const INF = 1e9;
       const d = new Float32Array(W * H).fill(INF);
@@ -410,15 +266,109 @@
     }
 
     const inkDist = distanceFromInk();
-    const contourLoops = extractIsoLoops(inkDist, R4 + 1);
-    // Left-to-right order — the pass reads as outlining each glyph (and its
-    // counters) in sequence, B then E then N…
-    contourLoops.sort((a, b) => {
-      const cxA = a.reduce((s, p) => s + p.x, 0) / a.length;
-      const cxB = b.reduce((s, p) => s + p.x, 0) / b.length;
-      return cxA - cxB;
-    });
-    const finOuterPath: RPt[] = ([] as RPt[]).concat(...contourLoops);
+
+    // Builds one pass's complete toolpath: concentric offset rings of
+    // `field`, stepping from `fromLevel` down to `toLevel` by `step`. Each
+    // ring's loops are ordered left-to-right so the pass reads as sweeping
+    // the plate (or, close in, outlining each glyph) in reading order.
+    function buildContourRings(field: Float32Array, fromLevel: number, toLevel: number, step: number): RPt[] {
+      const levels: number[] = [];
+      if (fromLevel <= toLevel) {
+        levels.push(toLevel);
+      } else {
+        for (let lvl = fromLevel; lvl > toLevel; lvl -= step) levels.push(lvl);
+        levels.push(toLevel);
+      }
+      const path: RPt[] = [];
+      for (const level of levels) {
+        const loops = extractIsoLoops(field, level);
+        loops.sort((a, b) => {
+          const cxA = a.reduce((s, p) => s + p.x, 0) / a.length;
+          const cxB = b.reduce((s, p) => s + p.x, 0) / b.length;
+          return cxA - cxB;
+        });
+        path.push(...([] as RPt[]).concat(...loops));
+      }
+      return path;
+    }
+
+    let maxDist = 0;
+    for (let i = 0; i < inkDist.length; i++) if (inkDist[i] > maxDist) maxDist = inkDist[i];
+
+    // Pass 1: sweep in from the field's farthest point down to R1 of every
+    // glyph — the tool spirals toward the text instead of raking back and
+    // forth blind to its shape.
+    const roughPath1 = buildContourRings(inkDist, Math.max(R1, maxDist - R1 * 0.5), R1, R1);
+    // Pass 2: continue inward from where pass 1 left off, down to R2.
+    // Levels between R1 and R2 only produce contour crossings close to the
+    // letters (anything farther was already cleared by pass 1), so this
+    // naturally stays local without an explicit y-band restriction.
+    const roughPath2 = buildContourRings(inkDist, R1, R2, R2);
+    // Finishing: one tight ring hugging the true profile, R4 plus clearance
+    // out — every glyph's outer silhouette and every enclosed counter.
+    const finOuterPath = buildContourRings(inkDist, R4 + 1, R4 + 1, R4);
+
+    /* ── Pre-render: machined field texture (roughing pass, tool R1) ──────── */
+    const fieldOff = mkCanvas(PW, PH);
+    const fiCtx    = fieldOff.getContext('2d')!;
+    fiCtx.scale(DPR, DPR);
+    renderField(fiCtx, W, H, R1, R1, inkDist);
+
+    /* ── Pre-render: finer field texture left by the semi-finish pass ─────── */
+    // Same model, smaller tool + tighter stepover (R2) — a real, visibly
+    // finer witness-mark pattern, revealed only where pass 2 actually ran.
+    const fieldOff2 = mkCanvas(PW, PH);
+    const fiCtx2    = fieldOff2.getContext('2d')!;
+    fiCtx2.scale(DPR, DPR);
+    renderField(fiCtx2, W, H, R2, R2, inkDist);
+
+    /* ── Pre-render: drop shadow shape ───────────────────────────────────── */
+    // Dark fill masked to offset-text shape, minus the letter body itself
+    const shadowOff = mkCanvas(PW, PH);
+    const shCtx     = shadowOff.getContext('2d')!;
+    shCtx.scale(DPR, DPR);
+    shCtx.fillStyle = 'rgba(0,0,0,0.68)';
+    shCtx.fillRect(0, 0, W, H);
+    shCtx.globalCompositeOperation = 'destination-in';
+    shCtx.font = FONT; shCtx.textAlign = 'center'; shCtx.textBaseline = 'alphabetic';
+    shCtx.fillStyle = '#fff';
+    shCtx.fillText('BENJAMIN', W / 2 + SHX, L1Y + SHY);
+    shCtx.fillText('DAVIS',    W / 2 + SHX, L2Y + SHY);
+    shCtx.globalCompositeOperation = 'destination-out';
+    shCtx.fillText('BENJAMIN', W / 2, L1Y);
+    shCtx.fillText('DAVIS',    W / 2, L2Y);
+    shCtx.globalCompositeOperation = 'source-over';
+
+    /* ── Cut accumulation map (grows each frame) ─────────────────────────── */
+    const cutOff = mkCanvas(PW, PH);
+    const cuCtx  = cutOff.getContext('2d')!;
+    cuCtx.scale(DPR, DPR);
+
+    /* ── Fine-pass accumulation map — only pass 2's own travel marks this ── */
+    const cut2Off = mkCanvas(PW, PH);
+    const cu2Ctx  = cut2Off.getContext('2d')!;
+    cu2Ctx.scale(DPR, DPR);
+
+    /* ── Near-pass reveal map (same strokes, no letter exclusion) ────────── */
+    // Round stroke caps bleed into letter edges — letters emerge as tool passes
+    const nearOff = mkCanvas(PW, PH);
+    const neCtx   = nearOff.getContext('2d')!;
+    neCtx.scale(DPR, DPR);
+
+    /* ── Settled chip surface ────────────────────────────────────────────── */
+    const settledOff = mkCanvas(PW, PH);
+    const seCtx      = settledOff.getContext('2d')!;
+    seCtx.scale(DPR, DPR);
+
+    /* ── Chips that settled on raised letter faces ───────────────────────── */
+    const letterChipsOff = mkCanvas(PW, PH);
+    const lcCtx          = letterChipsOff.getContext('2d')!;
+    lcCtx.scale(DPR, DPR);
+
+    /* ── Compositing scratch pad ─────────────────────────────────────────── */
+    const tmpOff = mkCanvas(PW, PH);
+    const tmCtx  = tmpOff.getContext('2d')!;
+    tmCtx.scale(DPR, DPR);
 
     /* ── Ramped feed control ───────────────────────────────────────────────
        A real controller can't jump straight to programmed feed — it ramps
@@ -869,7 +819,7 @@
       | 'settle'
       | 'retract'   | 'done';
 
-    const approachDest = rasterPath1.length > 0 ? rasterPath1[0] : { x: W / 2, y: R1 };
+    const approachDest = roughPath1.length > 0 ? roughPath1[0] : { x: W / 2, y: R1 };
 
     let phase: Phase = 'approach';
     let tx     = W / 2;
@@ -905,14 +855,14 @@
         lifted = true;
         if (appT >= 1) {
           tx = approachDest.x; ty = approachDest.y;
-          phase = rasterPath1.length > 0 ? 'rough1' : 'fin_rapid';
+          phase = roughPath1.length > 0 ? 'rough1' : 'fin_rapid';
           pathIdx = 0; lifted = false;
         }
       }
 
-      /* ── PASS 1: raster roughing (tool R1, ramped feed) ───────────────── */
+      /* ── PASS 1: bulk roughing — contour rings spiral in (tool R1) ────── */
       else if (phase === 'rough1') {
-        const res = stepAlong(rasterPath1, pathIdx, tx, ty, dt, FEED_R, R1,
+        const res = stepAlong(roughPath1, pathIdx, tx, ty, dt, FEED_R, R1,
           (nx, ny, fx, fy, w, load, dirX) => {
             cut(nx, ny, fx, fy, w);
             const k = 0.5 + 0.5 * load;
@@ -922,8 +872,8 @@
           });
         pathIdx = res.pathIdx; tx = res.tx; ty = res.ty;
         lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
-        if (pathIdx >= rasterPath1.length) {
-          if (rasterPath2.length > 0) { phase = 'r2_rapid'; curR = R2; }
+        if (pathIdx >= roughPath1.length) {
+          if (roughPath2.length > 0) { phase = 'r2_rapid'; curR = R2; }
           else { phase = 'fin_rapid'; curR = R4; }
           pathIdx = 0;
         }
@@ -932,9 +882,9 @@
       /* ── RAPID TO PASS 2 START ───────────────────────────────────────── */
       else if (phase === 'r2_rapid') {
         lifted = true; cutting = false;
-        if (!rasterPath2.length) { phase = 'fin_rapid'; pathIdx = 0; curR = R4; }
+        if (!roughPath2.length) { phase = 'fin_rapid'; pathIdx = 0; curR = R4; }
         else {
-          const dest = rasterPath2[0];
+          const dest = roughPath2[0];
           const dx = dest.x - tx, dy = dest.y - ty;
           const dist = Math.hypot(dx, dy);
           const spd = rampToward(RAPID, RATE_RAPID, dt);
@@ -943,9 +893,9 @@
         }
       }
 
-      /* ── PASS 2: semi-finish raster near letters (tool R2, finer surface) ─ */
+      /* ── PASS 2: semi-finish — tighter contour rings (tool R2, finer surface) ─ */
       else if (phase === 'rough2') {
-        const res = stepAlong(rasterPath2, pathIdx, tx, ty, dt, FEED_SF, R2,
+        const res = stepAlong(roughPath2, pathIdx, tx, ty, dt, FEED_SF, R2,
           (nx, ny, fx, fy, w, load, dirX) => {
             cut(nx, ny, fx, fy, w);
             cut2(nx, ny, fx, fy, w);
@@ -955,7 +905,7 @@
           });
         pathIdx = res.pathIdx; tx = res.tx; ty = res.ty;
         lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
-        if (pathIdx >= rasterPath2.length) {
+        if (pathIdx >= roughPath2.length) {
           phase = finOuterPath.length > 0 ? 'fin_rapid' : 'retract';
           pathIdx = 0; curR = R4;
           if (phase === 'retract') { animDone = true; finalizeCutMask(); }
@@ -1065,40 +1015,67 @@
   }
 
   /* ── Pre-render: machined brass pocket texture ──────────────────────────── */
-  // rowPitch matches the real toolpath stepover for this pass; amplitude
+  // The toolpath itself is now concentric rings offset from the ink, so the
+  // witness marks it leaves are concentric too — rendered straight from the
+  // same distance-from-ink field the toolpath was built from, instead of a
+  // row pattern that would visibly disagree with how the tool actually
+  // moved. `ringPitch` matches the real stepover for this pass; amplitude
   // approximates the witness-mark height a round tool of radius `toolR`
   // leaves at that stepover (chord-height of the uncut cusp between two
-  // adjacent passes) — a small tool on a tight stepover genuinely leaves a
+  // adjacent rings) — a small tool on a tight stepover genuinely leaves a
   // finer, shallower pattern than a big roughing tool on a wide stepover.
-  function renderField(ctx: CanvasRenderingContext2D, W: number, H: number, toolR: number, stepover: number) {
-    // Freshly cut brass is still yellow-gold — matte/dimmer than the polished top
+  function hashRing(n: number): number {
+    const s = Math.sin(n * 12.9898) * 43758.5453;
+    return s - Math.floor(s);
+  }
+
+  function renderField(
+    ctx: CanvasRenderingContext2D, W: number, H: number,
+    toolR: number, stepover: number, distField: Float32Array
+  ) {
+    const ringPitch = Math.max(2, stepover);
+    const half       = Math.min(ringPitch / 2, toolR);
+    const cusp       = (toolR - Math.sqrt(Math.max(0, toolR * toolR - half * half))) * 1.9; // visual gain
+    const lineHalfW  = Math.min(0.85, ringPitch * 0.11 + 0.35); // in distance-units either side of a ring
+
+    // Base matte brass fill — freshly cut brass is yellow-gold, dimmer than
+    // the polished top surface.
     ctx.fillStyle = '#8a6914';
     ctx.fillRect(0, 0, W, H);
 
-    const rowPitch = Math.max(2, stepover);
-    const half     = Math.min(rowPitch / 2, toolR);
-    const cusp     = (toolR - Math.sqrt(Math.max(0, toolR * toolR - half * half))) * 1.9; // visual gain
+    const img  = ctx.getImageData(0, 0, W, H);
+    const data = img.data;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        const d = distField[i];
+        const ring = Math.floor(d / ringPitch);
+        const bandPos = d - ring * ringPitch;
+        const edge = Math.min(bandPos, ringPitch - bandPos); // distance to nearest ring line
+        if (edge > lineHalfW) continue;                       // mid-band — leave base fill
 
-    // Raster scallop toolmarks — per-row amplitude + phase jitter (real CNC isn't perfectly regular)
-    for (let y = -rowPitch; y < H + rowPitch; y += rowPitch) {
-      const amp   = cusp * (0.82 + Math.random() * 0.32);        // amplitude variation
-      const phase = (Math.random() - 0.5) * 0.30;                 // subtle phase offset
-      ctx.beginPath(); ctx.moveTo(0, y);
-      for (let x = 0; x <= W; x += 3) {
-        ctx.lineTo(x, y + Math.sin((x / rowPitch) * Math.PI * 2 + phase) * amp);
+        const t      = 1 - edge / lineHalfW;                  // 1 at the ring line, fading outward
+        const jitter = 0.82 + hashRing(ring) * 0.32;           // per-ring amplitude variation
+        const lit    = hashRing(ring * 7 + 3) > 0.42;          // alternating light/dark, like real toolmarks
+        const depth  = Math.min(1, cusp / 3);                  // deeper cusp (bigger tool) reads more strongly
+        const gain   = t * jitter * depth;
+
+        const pi = i * 4;
+        if (lit) {
+          data[pi]     = Math.min(255, data[pi]     + 72 * gain);
+          data[pi + 1] = Math.min(255, data[pi + 1] + 56 * gain);
+          data[pi + 2] = Math.min(255, data[pi + 2] + 14 * gain);
+        } else {
+          data[pi]     = Math.max(0, data[pi]     - 42 * gain);
+          data[pi + 1] = Math.max(0, data[pi + 1] - 26 * gain);
+          data[pi + 2] = Math.max(0, data[pi + 2] -  4 * gain);
+        }
       }
-      const even = Math.round(y / rowPitch) % 2 === 0;
-      ctx.strokeStyle = even ? 'rgba(210,165,45,0.48)' : 'rgba(50,28,0,0.30)';
-      ctx.lineWidth = Math.min(0.88, rowPitch * 0.1 + 0.4); ctx.stroke();
     }
-    // Subtle secondary grid (cross-feed direction)
-    for (let y = 0; y < H; y += rowPitch * 2.1) {
-      ctx.strokeStyle = 'rgba(195,150,28,0.10)';
-      ctx.lineWidth = 0.4;
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
+    ctx.putImageData(img, 0, 0);
+
     // Shallow depth vignette — less dramatic, it's still bright metal
-    const vig = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H) * 0.75);
+    const vig = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.75);
     vig.addColorStop(0, 'rgba(0,0,0,0.02)');
     vig.addColorStop(1, 'rgba(0,0,0,0.24)');
     ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
