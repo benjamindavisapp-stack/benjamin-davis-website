@@ -288,82 +288,137 @@
       Math.max(R2, lyMin - R1 * 2),
       Math.min(H - R2, lyMax + R1 * 2));
 
-    /* ── Outer finishing: trace word contours at R4+1 offset ────────────── */
-    function mkFinOuter(sil: { x: number; yt: number; yb: number }[]): RPt[] {
-      if (!sil.length) return [];
-      const OFF = R4 + 1;
-      const bot = sil.map(c => ({ x: c.x, y: c.yb + OFF }));
-      const top = sil.slice().reverse().map(c => ({ x: c.x, y: c.yt - OFF }));
-      const first: RPt = { x: bot[0].x, y: bot[0].y, isGap: true };
-      return [first, ...bot.slice(1), ...top];
-    }
-    const finOuterPath: RPt[] = [...mkFinOuter(sil1), ...mkFinOuter(sil2)];
-
-    /* ── Counter finishing: trace enclosed letter voids (B/D/A bowls) ───── */
-    function findCounters(): { cx: number; cy: number; rw: number; rh: number }[] {
-      const outside = new Uint8Array(W * H);
-      const q: number[] = [];
-      for (let x = 0; x < W; x++) {
-        for (const y of [0, H - 1]) {
-          const i = y * W + x;
-          if (!outside[i] && mpx[i * 4] <= 60) { outside[i] = 1; q.push(i); }
-        }
-      }
-      for (let y = 1; y < H - 1; y++) {
-        for (const x of [0, W - 1]) {
-          const i = y * W + x;
-          if (!outside[i] && mpx[i * 4] <= 60) { outside[i] = 1; q.push(i); }
-        }
-      }
-      let qi = 0;
-      while (qi < q.length) {
-        const i = q[qi++];
-        const x = i % W, y = (i / W) | 0;
-        if (x > 0)     { const n = i - 1; if (!outside[n] && mpx[n * 4] <= 60) { outside[n] = 1; q.push(n); } }
-        if (x < W - 1) { const n = i + 1; if (!outside[n] && mpx[n * 4] <= 60) { outside[n] = 1; q.push(n); } }
-        if (y > 0)     { const n = i - W; if (!outside[n] && mpx[n * 4] <= 60) { outside[n] = 1; q.push(n); } }
-        if (y < H - 1) { const n = i + W; if (!outside[n] && mpx[n * 4] <= 60) { outside[n] = 1; q.push(n); } }
-      }
-      const labeled = new Uint8Array(W * H);
-      const ctrs: { cx: number; cy: number; rw: number; rh: number }[] = [];
+    /* ── Finishing contour: trace the true letter outlines ────────────────
+       Real relief-engraving finishing doesn't sweep a bounding envelope —
+       it hugs the actual glyph silhouette, including every curve, serif,
+       and enclosed counter (the bowls of B/D, the triangle of A…). We get
+       that by building a distance-from-ink field over the whole canvas,
+       then tracing its isocontour at exactly one tool-radius-plus-clearance
+       out. That single isocontour is, automatically, both the outer offset
+       around every glyph AND the inward offset inside every enclosed hole
+       (distance-to-ink increases away from the letter on both sides of its
+       wall), so one pass of this produces a correct finishing path for the
+       whole nameplate — no separate "outer" vs "counter" logic needed. */
+    function distanceFromInk(): Float32Array {
+      const INF = 1e9;
+      const d = new Float32Array(W * H).fill(INF);
+      for (let i = 0; i < W * H; i++) if (mpx[i * 4] > 60) d[i] = 0;
+      const D1 = 1, D2 = Math.SQRT2;
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
           const i = y * W + x;
-          if (labeled[i] || outside[i] || mpx[i * 4] > 60) continue;
-          const cq: number[] = [i]; labeled[i] = 1;
-          let qi2 = 0, mnX = x, mxX = x, mnY = y, mxY = y, sX = 0, sY = 0, cnt = 0;
-          while (qi2 < cq.length) {
-            const ci = cq[qi2++], cx = ci % W, cy = (ci / W) | 0;
-            if (cx < mnX) mnX = cx; if (cx > mxX) mxX = cx;
-            if (cy < mnY) mnY = cy; if (cy > mxY) mxY = cy;
-            sX += cx; sY += cy; cnt++;
-            if (cx > 0)     { const n = ci - 1; if (!labeled[n] && !outside[n] && mpx[n * 4] <= 60) { labeled[n] = 1; cq.push(n); } }
-            if (cx < W - 1) { const n = ci + 1; if (!labeled[n] && !outside[n] && mpx[n * 4] <= 60) { labeled[n] = 1; cq.push(n); } }
-            if (cy > 0)     { const n = ci - W; if (!labeled[n] && !outside[n] && mpx[n * 4] <= 60) { labeled[n] = 1; cq.push(n); } }
-            if (cy < H - 1) { const n = ci + W; if (!labeled[n] && !outside[n] && mpx[n * 4] <= 60) { labeled[n] = 1; cq.push(n); } }
-          }
-          if (cnt >= 20) ctrs.push({ cx: sX / cnt, cy: sY / cnt, rw: (mxX - mnX) / 2, rh: (mxY - mnY) / 2 });
+          let v = d[i];
+          if (x > 0)              v = Math.min(v, d[i - 1] + D1);
+          if (y > 0)              v = Math.min(v, d[i - W] + D1);
+          if (x > 0 && y > 0)     v = Math.min(v, d[i - W - 1] + D2);
+          if (x < W - 1 && y > 0) v = Math.min(v, d[i - W + 1] + D2);
+          d[i] = v;
         }
       }
-      return ctrs;
+      for (let y = H - 1; y >= 0; y--) {
+        for (let x = W - 1; x >= 0; x--) {
+          const i = y * W + x;
+          let v = d[i];
+          if (x < W - 1)              v = Math.min(v, d[i + 1] + D1);
+          if (y < H - 1)              v = Math.min(v, d[i + W] + D1);
+          if (x < W - 1 && y < H - 1) v = Math.min(v, d[i + W + 1] + D2);
+          if (x > 0 && y < H - 1)     v = Math.min(v, d[i + W - 1] + D2);
+          d[i] = v;
+        }
+      }
+      return d;
     }
 
-    function buildCounterPaths(): RPt[] {
-      const path: RPt[] = [];
-      for (const ctr of findCounters()) {
-        const rw = ctr.rw - R4, rh = ctr.rh - R4;
-        if (rw < R4 || rh < R4) continue;
-        const N = Math.max(10, Math.ceil(Math.PI * (rw + rh) / 3));
-        for (let i = 0; i <= N; i++) {
-          const a = (i / N) * Math.PI * 2;
-          const pt: RPt = { x: ctr.cx + rw * Math.cos(a), y: ctr.cy + rh * Math.sin(a) };
-          if (i === 0) pt.isGap = true;
-          path.push(pt);
+    // Marching squares over `field`, isocontour at `level`, stitched into
+    // closed-loop polylines (sub-pixel accurate via linear edge interpolation).
+    function extractIsoLoops(field: Float32Array, level: number): RPt[][] {
+      type Seg = [number, number, number, number];
+      const segs: Seg[] = [];
+      const val = (x: number, y: number) => field[y * W + x];
+      const interp = (xa: number, ya: number, va: number, xb: number, yb: number, vb: number): [number, number] => {
+        const t = (level - va) / (vb - va);
+        return [xa + (xb - xa) * t, ya + (yb - ya) * t];
+      };
+      for (let y = 0; y < H - 1; y++) {
+        for (let x = 0; x < W - 1; x++) {
+          const v00 = val(x, y), v10 = val(x + 1, y), v11 = val(x + 1, y + 1), v01 = val(x, y + 1);
+          let idx = 0;
+          if (v00 > level) idx |= 1;
+          if (v10 > level) idx |= 2;
+          if (v11 > level) idx |= 4;
+          if (v01 > level) idx |= 8;
+          if (idx === 0 || idx === 15) continue;
+          const top    = () => interp(x, y, v00, x + 1, y, v10);
+          const right  = () => interp(x + 1, y, v10, x + 1, y + 1, v11);
+          const bottom = () => interp(x, y + 1, v01, x + 1, y + 1, v11);
+          const left   = () => interp(x, y, v00, x, y + 1, v01);
+          const add = (a: [number, number], b: [number, number]) => segs.push([a[0], a[1], b[0], b[1]]);
+          switch (idx) {
+            case 1: case 14: add(left(), top()); break;
+            case 2: case 13: add(top(), right()); break;
+            case 3: case 12: add(left(), right()); break;
+            case 4: case 11: add(right(), bottom()); break;
+            case 6: case 9:  add(top(), bottom()); break;
+            case 7: case 8:  add(left(), bottom()); break;
+            case 5: {
+              const c = (v00 + v10 + v11 + v01) / 4;
+              if (c > level) { add(left(), top()); add(right(), bottom()); }
+              else            { add(left(), bottom()); add(top(), right()); }
+              break;
+            }
+            case 10: {
+              const c = (v00 + v10 + v11 + v01) / 4;
+              if (c > level) { add(top(), right()); add(left(), bottom()); }
+              else            { add(left(), top()); add(right(), bottom()); }
+              break;
+            }
+          }
         }
       }
-      return path;
+      // Stitch the unordered segment soup into closed loops by snapping
+      // shared endpoints to a quarter-pixel grid key.
+      const key = (x: number, y: number) => `${Math.round(x * 4)},${Math.round(y * 4)}`;
+      const bucket = new Map<string, number[]>();
+      segs.forEach((s, i) => {
+        for (const [px, py] of [[s[0], s[1]], [s[2], s[3]]] as [number, number][]) {
+          const k = key(px, py);
+          const arr = bucket.get(k);
+          if (arr) arr.push(i); else bucket.set(k, [i]);
+        }
+      });
+      const used = new Uint8Array(segs.length);
+      const loops: RPt[][] = [];
+      for (let i = 0; i < segs.length; i++) {
+        if (used[i]) continue;
+        used[i] = 1;
+        const loop: RPt[] = [{ x: segs[i][0], y: segs[i][1], isGap: true }, { x: segs[i][2], y: segs[i][3] }];
+        let endX = segs[i][2], endY = segs[i][3];
+        let guard = 0;
+        while (guard++ < segs.length + 5) {
+          const candidates = bucket.get(key(endX, endY)) || [];
+          const next = candidates.find(j => !used[j]);
+          if (next === undefined) break;
+          used[next] = 1;
+          const s = segs[next];
+          const d0 = Math.hypot(s[0] - endX, s[1] - endY), d1 = Math.hypot(s[2] - endX, s[3] - endY);
+          if (d0 <= d1) { endX = s[2]; endY = s[3]; } else { endX = s[0]; endY = s[1]; }
+          loop.push({ x: endX, y: endY });
+        }
+        if (loop.length >= 6) loops.push(loop);
+      }
+      return loops;
     }
-    const ctrPath = buildCounterPaths();
+
+    const inkDist = distanceFromInk();
+    const contourLoops = extractIsoLoops(inkDist, R4 + 1);
+    // Left-to-right order — the pass reads as outlining each glyph (and its
+    // counters) in sequence, B then E then N…
+    contourLoops.sort((a, b) => {
+      const cxA = a.reduce((s, p) => s + p.x, 0) / a.length;
+      const cxB = b.reduce((s, p) => s + p.x, 0) / b.length;
+      return cxA - cxB;
+    });
+    const finOuterPath: RPt[] = ([] as RPt[]).concat(...contourLoops);
 
     /* ── Ramped feed control ───────────────────────────────────────────────
        A real controller can't jump straight to programmed feed — it ramps
@@ -568,6 +623,23 @@
       neCtx.moveTo(fromX, fromY);
       neCtx.lineTo(x, y);
       neCtx.stroke();
+    }
+
+    // Guarantees full, gap-free coverage once finishing completes. The
+    // traced rings clear everything a tool of this size can physically
+    // reach, but letters kerned tighter than the smallest tool's diameter
+    // leave a sliver no toolpath can enter — a real machining limit, not a
+    // bug. Rather than let that read as "fused" letters on screen, finish
+    // with the same instant full-field cut used for reduced-motion: it's
+    // the correct final state the real part would have after a cleanup
+    // pass with whatever finer method (hand engraving, a smaller burr)
+    // actually reaches that last web.
+    function finalizeCutMask() {
+      cuCtx.fillStyle = '#fff';
+      cuCtx.fillRect(0, 0, W, H);
+      cuCtx.globalCompositeOperation = 'destination-out';
+      cuCtx.drawImage(maskOff, 0, 0, W, H);
+      cuCtx.globalCompositeOperation = 'source-over';
     }
 
     // Marks only the finer cut2Off map — used during the semi-finish pass so
@@ -794,7 +866,6 @@
       | 'approach'
       | 'rough1'    | 'r2_rapid'  | 'rough2'
       | 'fin_rapid' | 'finishing'
-      | 'ctr_rapid' | 'counters'
       | 'settle'
       | 'retract'   | 'done';
 
@@ -887,7 +958,7 @@
         if (pathIdx >= rasterPath2.length) {
           phase = finOuterPath.length > 0 ? 'fin_rapid' : 'retract';
           pathIdx = 0; curR = R4;
-          if (phase === 'retract') animDone = true;
+          if (phase === 'retract') { animDone = true; finalizeCutMask(); }
         }
       }
 
@@ -895,8 +966,8 @@
       else if (phase === 'fin_rapid') {
         lifted = true; cutting = false;
         if (!finOuterPath.length) {
-          phase = ctrPath.length > 0 ? 'ctr_rapid' : 'retract';
-          pathIdx = 0; if (phase === 'retract') animDone = true;
+          phase = 'retract';
+          pathIdx = 0; animDone = true; finalizeCutMask();
         } else {
           const dest = finOuterPath[0];
           const dx = dest.x - tx, dy = dest.y - ty;
@@ -907,7 +978,9 @@
         }
       }
 
-      /* ── OUTER FINISHING: trace letter contours (tool R4, corner-aware) ── */
+      /* ── FINISHING: trace the true letter contours (tool R4, corner-aware) ─
+         One continuous pass — every glyph's outer silhouette and every
+         enclosed counter, in left-to-right reading order. */
       else if (phase === 'finishing') {
         const res = stepAlong(finOuterPath, pathIdx, tx, ty, dt, FEED_F, R4,
           (nx, ny, fx, fy, w, load, dirX) => {
@@ -919,36 +992,9 @@
         pathIdx = res.pathIdx; tx = res.tx; ty = res.ty;
         lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
         if (pathIdx >= finOuterPath.length) {
-          phase = ctrPath.length > 0 ? 'ctr_rapid' : 'retract';
-          pathIdx = 0;
-          if (phase === 'retract') animDone = true;
+          animDone = true; finalizeCutMask();
+          phase = 'settle'; settleT = 0;
         }
-      }
-
-      /* ── RAPID TO COUNTER PASSES ─────────────────────────────────────── */
-      else if (phase === 'ctr_rapid') {
-        lifted = true; cutting = false;
-        if (!ctrPath.length) { animDone = true; phase = 'settle'; settleT = 0; }
-        else {
-          const dest = ctrPath[0];
-          const dx = dest.x - tx, dy = dest.y - ty;
-          const dist = Math.hypot(dx, dy);
-          const spd = rampToward(RAPID, RATE_RAPID, dt);
-          if (dist < 3) { tx = dest.x; ty = dest.y; phase = 'counters'; pathIdx = 0; }
-          else { const s = Math.min(spd * dt / dist, 1); tx += dx * s; ty += dy * s; }
-        }
-      }
-
-      /* ── COUNTER FINISHING: trace inner letter voids (tool R4) ───────── */
-      else if (phase === 'counters') {
-        const res = stepAlong(ctrPath, pathIdx, tx, ty, dt, FEED_F, R4,
-          (nx, ny, fx, fy, w, load, dirX) => {
-            cut(nx, ny, fx, fy, w);
-            if (Math.random() < 0.08 * (0.5 + 0.5 * load)) emitNeedle(nx, ny, dirX);
-          });
-        pathIdx = res.pathIdx; tx = res.tx; ty = res.ty;
-        lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
-        if (pathIdx >= ctrPath.length) { animDone = true; phase = 'settle'; settleT = 0; }
       }
 
       /* ── SETTLE: brief pause so viewer registers the finished nameplate ─ */
