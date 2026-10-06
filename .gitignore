@@ -6,4 +6,6 @@ dist/
 cnc-check.mjs
 cnc-dims.mjs
 cnc-verify.mjs
+cnc-watch.mjs
+cnc-zoom.mjs
 dev.log

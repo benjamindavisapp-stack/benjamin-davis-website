@@ -103,17 +103,31 @@
     const SHX    = Math.ceil(R * 0.45);
     const SHY    = Math.ceil(R * 0.62);
 
+    // Feed-rate response: how fast the simulated servo loop reaches a target
+    // speed. Rapids snap faster than cutting feeds — no cutting load to
+    // fight through — matching real controller acceleration limits.
+    const RATE_FEED  = 11;  // 1/s — time constant ≈ 90ms
+    const RATE_RAPID = 17;  // 1/s — time constant ≈ 59ms
+
     /* ── Pre-render: brass top surface ───────────────────────────────────── */
     const brassOff = mkCanvas(PW, PH);
     const brCtx    = brassOff.getContext('2d')!;
     brCtx.scale(DPR, DPR);
     renderBrass(brCtx, W, H);
 
-    /* ── Pre-render: machined field texture ──────────────────────────────── */
+    /* ── Pre-render: machined field texture (roughing pass, tool R1) ──────── */
     const fieldOff = mkCanvas(PW, PH);
     const fiCtx    = fieldOff.getContext('2d')!;
     fiCtx.scale(DPR, DPR);
-    renderField(fiCtx, W, H, R1);
+    renderField(fiCtx, W, H, R1, R1);
+
+    /* ── Pre-render: finer field texture left by the semi-finish pass ─────── */
+    // Same model, smaller tool + tighter stepover (R2) — a real, visibly
+    // finer witness-mark pattern, revealed only where pass 2 actually ran.
+    const fieldOff2 = mkCanvas(PW, PH);
+    const fiCtx2    = fieldOff2.getContext('2d')!;
+    fiCtx2.scale(DPR, DPR);
+    renderField(fiCtx2, W, H, R2, R2);
 
     /* ── Pre-render: letter mask (transparent bg, white letters) ─────────── */
     const maskOff = mkCanvas(PW, PH);
@@ -147,6 +161,11 @@
     const cutOff = mkCanvas(PW, PH);
     const cuCtx  = cutOff.getContext('2d')!;
     cuCtx.scale(DPR, DPR);
+
+    /* ── Fine-pass accumulation map — only pass 2's own travel marks this ── */
+    const cut2Off = mkCanvas(PW, PH);
+    const cu2Ctx  = cut2Off.getContext('2d')!;
+    cu2Ctx.scale(DPR, DPR);
 
     /* ── Near-pass reveal map (same strokes, no letter exclusion) ────────── */
     // Round stroke caps bleed into letter edges — letters emerge as tool passes
@@ -346,6 +365,78 @@
     }
     const ctrPath = buildCounterPaths();
 
+    /* ── Ramped feed control ───────────────────────────────────────────────
+       A real controller can't jump straight to programmed feed — it ramps
+       in, holds, and eases back down approaching a direction change. One
+       shared "current speed" models that for every move (rapid or feed);
+       lookaheadFactor() finds how hard the geometry just ahead should pull
+       that speed down (a sharp corner, or an upcoming cut↔rapid transition). */
+    let rampSpeed = 0;
+
+    function rampToward(target: number, rate: number, dt: number): number {
+      rampSpeed += (target - rampSpeed) * Math.min(1, dt * rate);
+      return rampSpeed;
+    }
+
+    function lookaheadFactor(path: RPt[], idx: number, fromX: number, fromY: number): number {
+      if (idx >= path.length) return 0.3;
+      const cur = path[idx];
+      const d1x = cur.x - fromX, d1y = cur.y - fromY;
+      const d1  = Math.hypot(d1x, d1y) || 1;
+      let j = idx + 1;
+      while (j < path.length && Math.hypot(path[j].x - cur.x, path[j].y - cur.y) < 0.5) j++;
+      if (j >= path.length) return 0.3;
+      const nxt = path[j];
+      const d2x = nxt.x - cur.x, d2y = nxt.y - cur.y;
+      const d2  = Math.hypot(d2x, d2y) || 1;
+      const cosA = Math.max(-1, Math.min(1, (d1x * d2x + d1y * d2y) / (d1 * d2)));
+      let factor = Math.cos(Math.acos(cosA) / 2);
+      if (!!nxt.isGap !== !!cur.isGap) factor = Math.min(factor, 0.42); // mode change just ahead
+      return Math.max(0.3, factor);
+    }
+
+    interface StepResult { pathIdx: number; tx: number; ty: number; cutting: boolean; lifted: boolean; loadFrac: number; }
+
+    // Advances the tool along `path` for one frame's worth of ramped motion,
+    // calling onCut for every cutting sub-segment actually traversed.
+    function stepAlong(
+      path: RPt[], pathIdx: number, tx: number, ty: number, dt: number,
+      feed: number, toolR: number,
+      onCut: (nx: number, ny: number, fx: number, fy: number, w: number, loadFrac: number, dirX: number) => void
+    ): StepResult {
+      let cutting = false, lifted = false, loadFrac = 0;
+      let remaining = dt, guard = 0;
+      while (remaining > 1e-5 && pathIdx < path.length && guard++ < 400) {
+        const pt    = path[pathIdx];
+        const isGap = !!pt.isGap;
+        const base  = isGap ? RAPID : feed;
+        const dx = pt.x - tx, dy = pt.y - ty;
+        const dist = Math.hypot(dx, dy);
+
+        // Only ease toward the cornering factor within a braking distance of
+        // the upcoming point — otherwise a long straight run would spend its
+        // whole length throttled down just because a turn eventually follows.
+        const cornerF = lookaheadFactor(path, pathIdx, tx, ty);
+        const brake   = Math.max(toolR * 5, base * 0.10);
+        const prox    = Math.min(1, dist / brake);
+        const target  = base * (cornerF + (1 - cornerF) * prox);
+        const spd     = Math.max(rampToward(target, isGap ? RATE_RAPID : RATE_FEED, remaining), base * 0.06);
+        loadFrac = Math.min(1, spd / base);
+        lifted = isGap; cutting = !isGap;
+        if (dist <= 1.5) {
+          if (!isGap) onCut(pt.x, pt.y, tx, ty, toolR * 2.2, loadFrac, dx >= 0 ? 1 : -1);
+          tx = pt.x; ty = pt.y; pathIdx++;
+          remaining -= Math.max(dist, 0.001) / spd;
+        } else {
+          const s  = Math.min((spd * remaining) / dist, 1);
+          const nx = tx + dx * s, ny = ty + dy * s;
+          if (!isGap) onCut(nx, ny, tx, ty, toolR * 2.2, loadFrac, dx >= 0 ? 1 : -1);
+          tx = nx; ty = ny; remaining = 0;
+        }
+      }
+      return { pathIdx, tx, ty, cutting, lifted, loadFrac };
+    }
+
     // True once finishing passes are done — triggers full letter reveal
     let animDone = false;
     let animTime = 0;  // seconds since animation start, drives specular drift
@@ -375,6 +466,14 @@
       tmCtx.drawImage(fieldOff, 0, 0, W, H);
       tmCtx.globalCompositeOperation = 'destination-in';
       tmCtx.drawImage(cutOff, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'source-over';
+      sCtx.drawImage(tmpOff, 0, 0, W, H);
+
+      // 2b. Finer semi-finish texture overlay — only where pass 2 actually ran
+      tmCtx.clearRect(0, 0, W, H);
+      tmCtx.drawImage(fieldOff2, 0, 0, W, H);
+      tmCtx.globalCompositeOperation = 'destination-in';
+      tmCtx.drawImage(cut2Off, 0, 0, W, H);
       tmCtx.globalCompositeOperation = 'source-over';
       sCtx.drawImage(tmpOff, 0, 0, W, H);
 
@@ -471,11 +570,25 @@
       neCtx.stroke();
     }
 
+    // Marks only the finer cut2Off map — used during the semi-finish pass so
+    // its tighter witness-mark texture (fieldOff2) reveals exactly where that
+    // smaller tool actually travelled, layered on top of the coarse field.
+    function cut2(x: number, y: number, fromX = x, fromY = y, w = R2 * 2.2) {
+      cu2Ctx.strokeStyle = '#fff';
+      cu2Ctx.lineWidth   = w;
+      cu2Ctx.lineCap     = 'round';
+      cu2Ctx.lineJoin    = 'round';
+      cu2Ctx.beginPath();
+      cu2Ctx.moveTo(fromX, fromY);
+      cu2Ctx.lineTo(x, y);
+      cu2Ctx.stroke();
+    }
+
     /* ── Endmill ─────────────────────────────────────────────────────────── */
     function drawMill(
       ctx: CanvasRenderingContext2D,
       cx: number, cy: number, r: number,
-      angle: number, cutting: boolean, lifted: boolean
+      angle: number, cutting: boolean, lifted: boolean, loadFrac = 1
     ) {
       const FLUTES = 4, TRAIL = 5, TGAP = 0.20, SWEEP = 0.65;
       const DETAIL_MIN = 4; // below this radius skip flutes, render simplified disk
@@ -546,14 +659,16 @@
       ctx.beginPath(); ctx.arc(cx, cy, r * 0.975, 0, Math.PI * 2);
       ctx.strokeStyle = 'rgba(142,158,185,0.52)'; ctx.lineWidth = 1.2; ctx.stroke();
 
-      // Cutting heat glow (always when cutting)
+      // Cutting heat glow — brighter under full chip load, easing off through
+      // corner slowdowns where the tool is barely engaging the material
       if (cutting && !lifted) {
+        const load = 0.32 + 0.68 * loadFrac;
         const halo = ctx.createRadialGradient(cx, cy, r * 0.68, cx, cy, r * 1.82);
         halo.addColorStop(0,    'rgba(255,196,55,0)');
-        halo.addColorStop(0.60, 'rgba(255,172,35,0.18)');
+        halo.addColorStop(0.60, `rgba(255,172,35,${(0.18 * load).toFixed(3)})`);
         halo.addColorStop(1,    'rgba(255,112,10,0)');
         ctx.fillStyle = halo;
-        ctx.beginPath(); ctx.arc(cx, cy, r * 1.82, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, r * 1.82 * (0.85 + 0.15 * loadFrac), 0, Math.PI * 2); ctx.fill();
       }
     }
 
@@ -694,9 +809,8 @@
     let settleT  = 0;
     let lifted   = true;
     let curR     = R1;
+    let curLoad  = 1;
     let lastTs: number | null = null;
-    let lastCutX = -1;
-    let lastCutY = -1;
 
     // Show initial brass immediately before rAF starts
     composite();
@@ -725,47 +839,22 @@
         }
       }
 
-      /* ── PASS 1: raster roughing (tool R1, constant feed) ───────────── */
+      /* ── PASS 1: raster roughing (tool R1, ramped feed) ───────────────── */
       else if (phase === 'rough1') {
+        const res = stepAlong(rasterPath1, pathIdx, tx, ty, dt, FEED_R, R1,
+          (nx, ny, fx, fy, w, load, dirX) => {
+            cut(nx, ny, fx, fy, w);
+            const k = 0.5 + 0.5 * load;
+            if (Math.random() < 0.40 * k) emitChip(nx, ny, dirX);
+            if (Math.random() < 0.06 * k) emitBigChip(nx, ny, dirX);
+            if (Math.random() < 0.22 * k) emitNeedle(nx, ny, dirX);
+          });
+        pathIdx = res.pathIdx; tx = res.tx; ty = res.ty;
+        lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
         if (pathIdx >= rasterPath1.length) {
           if (rasterPath2.length > 0) { phase = 'r2_rapid'; curR = R2; }
           else { phase = 'fin_rapid'; curR = R4; }
           pathIdx = 0;
-        } else {
-          let budget = FEED_R * dt;
-          while (budget > 0 && pathIdx < rasterPath1.length) {
-            const pt   = rasterPath1[pathIdx];
-            const isGap = !!pt.isGap;
-            const spd  = isGap ? RAPID : FEED_R;
-            const dx   = pt.x - tx, dy = pt.y - ty;
-            const dist = Math.hypot(dx, dy);
-            lifted = isGap; cutting = !isGap;
-            if (dist <= 1.5) {
-              if (!isGap) {
-                cut(pt.x, pt.y, tx, ty, R1 * 2.2);
-                if (Math.random() < 0.40) emitChip(pt.x, pt.y, dx >= 0 ? 1 : -1);
-                if (Math.random() < 0.06) emitBigChip(pt.x, pt.y, dx >= 0 ? 1 : -1);
-                if (Math.random() < 0.22) emitNeedle(pt.x, pt.y, dx >= 0 ? 1 : -1);
-              }
-              tx = pt.x; ty = pt.y; pathIdx++;
-              budget -= isGap ? dist * (FEED_R / RAPID) : dist;
-            } else {
-              const s = Math.min(spd * dt / dist, 1);
-              const nx = tx + dx * s, ny = ty + dy * s;
-              if (!isGap) {
-                cut(nx, ny, tx, ty, R1 * 2.2);
-                if (Math.random() < 0.40) emitChip(nx, ny, dx >= 0 ? 1 : -1);
-                if (Math.random() < 0.05) emitBigChip(nx, ny, dx >= 0 ? 1 : -1);
-                if (Math.random() < 0.22) emitNeedle(nx, ny, dx >= 0 ? 1 : -1);
-              }
-              tx = nx; ty = ny; budget = 0;
-            }
-          }
-          if (pathIdx >= rasterPath1.length) {
-            if (rasterPath2.length > 0) { phase = 'r2_rapid'; curR = R2; }
-            else { phase = 'fin_rapid'; curR = R4; }
-            pathIdx = 0;
-          }
         }
       }
 
@@ -777,57 +866,34 @@
           const dest = rasterPath2[0];
           const dx = dest.x - tx, dy = dest.y - ty;
           const dist = Math.hypot(dx, dy);
+          const spd = rampToward(RAPID, RATE_RAPID, dt);
           if (dist < 3) { tx = dest.x; ty = dest.y; phase = 'rough2'; pathIdx = 0; }
-          else { const s = Math.min(RAPID * dt / dist, 1); tx += dx * s; ty += dy * s; }
+          else { const s = Math.min(spd * dt / dist, 1); tx += dx * s; ty += dy * s; }
         }
       }
 
-      /* ── PASS 2: semi-finish raster near letters (tool R2) ──────────── */
+      /* ── PASS 2: semi-finish raster near letters (tool R2, finer surface) ─ */
       else if (phase === 'rough2') {
+        const res = stepAlong(rasterPath2, pathIdx, tx, ty, dt, FEED_SF, R2,
+          (nx, ny, fx, fy, w, load, dirX) => {
+            cut(nx, ny, fx, fy, w);
+            cut2(nx, ny, fx, fy, w);
+            const k = 0.5 + 0.5 * load;
+            if (Math.random() < 0.28 * k) emitChip(nx, ny, dirX);
+            if (Math.random() < 0.18 * k) emitNeedle(nx, ny, dirX);
+          });
+        pathIdx = res.pathIdx; tx = res.tx; ty = res.ty;
+        lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
         if (pathIdx >= rasterPath2.length) {
           phase = finOuterPath.length > 0 ? 'fin_rapid' : 'retract';
           pathIdx = 0; curR = R4;
           if (phase === 'retract') animDone = true;
-        } else {
-          let budget = FEED_SF * dt;
-          while (budget > 0 && pathIdx < rasterPath2.length) {
-            const pt   = rasterPath2[pathIdx];
-            const isGap = !!pt.isGap;
-            const spd  = isGap ? RAPID : FEED_SF;
-            const dx   = pt.x - tx, dy = pt.y - ty;
-            const dist = Math.hypot(dx, dy);
-            lifted = isGap; cutting = !isGap;
-            if (dist <= 1.5) {
-              if (!isGap) {
-                cut(pt.x, pt.y, tx, ty, R2 * 2.2);
-                if (Math.random() < 0.28) emitChip(pt.x, pt.y, dx >= 0 ? 1 : -1);
-                if (Math.random() < 0.18) emitNeedle(pt.x, pt.y, dx >= 0 ? 1 : -1);
-              }
-              tx = pt.x; ty = pt.y; pathIdx++;
-              budget -= isGap ? dist * (FEED_SF / RAPID) : dist;
-            } else {
-              const s = Math.min(spd * dt / dist, 1);
-              const nx = tx + dx * s, ny = ty + dy * s;
-              if (!isGap) {
-                cut(nx, ny, tx, ty, R2 * 2.2);
-                if (Math.random() < 0.28) emitChip(nx, ny, dx >= 0 ? 1 : -1);
-                if (Math.random() < 0.18) emitNeedle(nx, ny, dx >= 0 ? 1 : -1);
-              }
-              tx = nx; ty = ny; budget = 0;
-            }
-          }
-          if (pathIdx >= rasterPath2.length) {
-            phase = finOuterPath.length > 0 ? 'fin_rapid' : 'retract';
-            pathIdx = 0; curR = R4;
-            if (phase === 'retract') animDone = true;
-          }
         }
       }
 
       /* ── RAPID TO OUTER FINISHING ────────────────────────────────────── */
       else if (phase === 'fin_rapid') {
         lifted = true; cutting = false;
-        lastCutX = -1; lastCutY = -1;
         if (!finOuterPath.length) {
           phase = ctrPath.length > 0 ? 'ctr_rapid' : 'retract';
           pathIdx = 0; if (phase === 'retract') animDone = true;
@@ -835,103 +901,54 @@
           const dest = finOuterPath[0];
           const dx = dest.x - tx, dy = dest.y - ty;
           const dist = Math.hypot(dx, dy);
+          const spd = rampToward(RAPID, RATE_RAPID, dt);
           if (dist < 3) { tx = dest.x; ty = dest.y; phase = 'finishing'; pathIdx = 0; }
-          else { const s = Math.min(RAPID * dt / dist, 1); tx += dx * s; ty += dy * s; }
+          else { const s = Math.min(spd * dt / dist, 1); tx += dx * s; ty += dy * s; }
         }
       }
 
-      /* ── OUTER FINISHING: trace letter contours (tool R4) ────────────── */
+      /* ── OUTER FINISHING: trace letter contours (tool R4, corner-aware) ── */
       else if (phase === 'finishing') {
+        const res = stepAlong(finOuterPath, pathIdx, tx, ty, dt, FEED_F, R4,
+          (nx, ny, fx, fy, w, load, dirX) => {
+            cut(nx, ny, fx, fy, w);
+            const k = 0.5 + 0.5 * load;
+            if (Math.random() < 0.10 * k) emitChip(nx, ny, dirX);
+            if (Math.random() < 0.18 * k) emitNeedle(nx, ny, dirX);
+          });
+        pathIdx = res.pathIdx; tx = res.tx; ty = res.ty;
+        lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
         if (pathIdx >= finOuterPath.length) {
           phase = ctrPath.length > 0 ? 'ctr_rapid' : 'retract';
-          pathIdx = 0; lastCutX = -1; lastCutY = -1;
+          pathIdx = 0;
           if (phase === 'retract') animDone = true;
-        } else {
-          let budget = FEED_F * dt;
-          while (budget > 0 && pathIdx < finOuterPath.length) {
-            const pt   = finOuterPath[pathIdx];
-            const isGap = !!pt.isGap;
-            const spd  = isGap ? RAPID : FEED_F;
-            const dx   = pt.x - tx, dy = pt.y - ty;
-            const dist = Math.hypot(dx, dy);
-            lifted = isGap; cutting = !isGap;
-            if (dist <= 1.5) {
-              if (!isGap) {
-                cut(pt.x, pt.y, tx, ty, R4 * 2.2);
-                lastCutX = pt.x; lastCutY = pt.y;
-                if (Math.random() < 0.10) emitChip(pt.x, pt.y, dx >= 0 ? 1 : -1);
-                if (Math.random() < 0.18) emitNeedle(pt.x, pt.y, dx >= 0 ? 1 : -1);
-              } else { lastCutX = -1; lastCutY = -1; }
-              tx = pt.x; ty = pt.y; pathIdx++;
-              budget -= isGap ? dist * (FEED_F / RAPID) : dist;
-            } else {
-              const s = Math.min(spd * dt / dist, 1);
-              const nx = tx + dx * s, ny = ty + dy * s;
-              if (!isGap) {
-                cut(nx, ny, tx, ty, R4 * 2.2);
-                lastCutX = nx; lastCutY = ny;
-                if (Math.random() < 0.10) emitChip(nx, ny, dx >= 0 ? 1 : -1);
-                if (Math.random() < 0.18) emitNeedle(nx, ny, dx >= 0 ? 1 : -1);
-              } else { lastCutX = -1; lastCutY = -1; }
-              tx = nx; ty = ny; budget = 0;
-            }
-          }
-          if (pathIdx >= finOuterPath.length) {
-            phase = ctrPath.length > 0 ? 'ctr_rapid' : 'retract';
-            pathIdx = 0; lastCutX = -1; lastCutY = -1;
-            if (phase === 'retract') animDone = true;
-          }
         }
       }
 
       /* ── RAPID TO COUNTER PASSES ─────────────────────────────────────── */
       else if (phase === 'ctr_rapid') {
         lifted = true; cutting = false;
-        lastCutX = -1; lastCutY = -1;
         if (!ctrPath.length) { animDone = true; phase = 'settle'; settleT = 0; }
         else {
           const dest = ctrPath[0];
           const dx = dest.x - tx, dy = dest.y - ty;
           const dist = Math.hypot(dx, dy);
+          const spd = rampToward(RAPID, RATE_RAPID, dt);
           if (dist < 3) { tx = dest.x; ty = dest.y; phase = 'counters'; pathIdx = 0; }
-          else { const s = Math.min(RAPID * dt / dist, 1); tx += dx * s; ty += dy * s; }
+          else { const s = Math.min(spd * dt / dist, 1); tx += dx * s; ty += dy * s; }
         }
       }
 
       /* ── COUNTER FINISHING: trace inner letter voids (tool R4) ───────── */
       else if (phase === 'counters') {
-        if (pathIdx >= ctrPath.length) {
-          animDone = true; phase = 'settle'; settleT = 0;
-        } else {
-          let budget = FEED_F * dt;
-          while (budget > 0 && pathIdx < ctrPath.length) {
-            const pt   = ctrPath[pathIdx];
-            const isGap = !!pt.isGap;
-            const spd  = isGap ? RAPID : FEED_F;
-            const dx   = pt.x - tx, dy = pt.y - ty;
-            const dist = Math.hypot(dx, dy);
-            lifted = isGap; cutting = !isGap;
-            if (dist <= 1.5) {
-              if (!isGap) {
-                cut(pt.x, pt.y, tx, ty, R4 * 2.2);
-                lastCutX = pt.x; lastCutY = pt.y;
-                if (Math.random() < 0.08) emitNeedle(pt.x, pt.y, dx >= 0 ? 1 : -1);
-              } else { lastCutX = -1; lastCutY = -1; }
-              tx = pt.x; ty = pt.y; pathIdx++;
-              budget -= isGap ? dist * (FEED_F / RAPID) : dist;
-            } else {
-              const s = Math.min(spd * dt / dist, 1);
-              const nx = tx + dx * s, ny = ty + dy * s;
-              if (!isGap) {
-                cut(nx, ny, tx, ty, R4 * 2.2);
-                lastCutX = nx; lastCutY = ny;
-                if (Math.random() < 0.08) emitNeedle(nx, ny, dx >= 0 ? 1 : -1);
-              } else { lastCutX = -1; lastCutY = -1; }
-              tx = nx; ty = ny; budget = 0;
-            }
-          }
-          if (pathIdx >= ctrPath.length) { animDone = true; phase = 'settle'; settleT = 0; }
-        }
+        const res = stepAlong(ctrPath, pathIdx, tx, ty, dt, FEED_F, R4,
+          (nx, ny, fx, fy, w, load, dirX) => {
+            cut(nx, ny, fx, fy, w);
+            if (Math.random() < 0.08 * (0.5 + 0.5 * load)) emitNeedle(nx, ny, dirX);
+          });
+        pathIdx = res.pathIdx; tx = res.tx; ty = res.ty;
+        lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
+        if (pathIdx >= ctrPath.length) { animDone = true; phase = 'settle'; settleT = 0; }
       }
 
       /* ── SETTLE: brief pause so viewer registers the finished nameplate ─ */
@@ -944,9 +961,9 @@
       /* ── RETRACT ─────────────────────────────────────────────────────── */
       else if (phase === 'retract') {
         lifted = true;
-        const spd = RAPID * 1.4 * dt;
-        tx += spd * 0.65;
-        ty -= spd * 0.75;
+        const spd = rampToward(RAPID * 1.4, RATE_RAPID, dt);
+        tx += spd * dt * 0.65;
+        ty -= spd * dt * 0.75;
         if (ty < -R * 5) phase = 'done';
       }
 
@@ -962,7 +979,7 @@
 
       composite();
       tickChips();
-      if (phase !== 'done') drawMill(fCtx, tx, ty, curR, spinA, cutting, lifted);
+      if (phase !== 'done') drawMill(fCtx, tx, ty, curR, spinA, cutting, lifted, curLoad);
       requestAnimationFrame(frame);
     }
 
@@ -1002,25 +1019,34 @@
   }
 
   /* ── Pre-render: machined brass pocket texture ──────────────────────────── */
-  function renderField(ctx: CanvasRenderingContext2D, W: number, H: number, step: number) {
+  // rowPitch matches the real toolpath stepover for this pass; amplitude
+  // approximates the witness-mark height a round tool of radius `toolR`
+  // leaves at that stepover (chord-height of the uncut cusp between two
+  // adjacent passes) — a small tool on a tight stepover genuinely leaves a
+  // finer, shallower pattern than a big roughing tool on a wide stepover.
+  function renderField(ctx: CanvasRenderingContext2D, W: number, H: number, toolR: number, stepover: number) {
     // Freshly cut brass is still yellow-gold — matte/dimmer than the polished top
     ctx.fillStyle = '#8a6914';
     ctx.fillRect(0, 0, W, H);
+
+    const rowPitch = Math.max(2, stepover);
+    const half     = Math.min(rowPitch / 2, toolR);
+    const cusp     = (toolR - Math.sqrt(Math.max(0, toolR * toolR - half * half))) * 1.9; // visual gain
+
     // Raster scallop toolmarks — per-row amplitude + phase jitter (real CNC isn't perfectly regular)
-    const rowPitch = step * 0.52;
     for (let y = -rowPitch; y < H + rowPitch; y += rowPitch) {
-      const amp   = step * 0.07 * (0.88 + Math.random() * 0.24);  // amplitude variation
-      const phase = (Math.random() - 0.5) * 0.30;                  // subtle phase offset
+      const amp   = cusp * (0.82 + Math.random() * 0.32);        // amplitude variation
+      const phase = (Math.random() - 0.5) * 0.30;                 // subtle phase offset
       ctx.beginPath(); ctx.moveTo(0, y);
       for (let x = 0; x <= W; x += 3) {
-        ctx.lineTo(x, y + Math.sin((x / step) * Math.PI * 2 + phase) * amp);
+        ctx.lineTo(x, y + Math.sin((x / rowPitch) * Math.PI * 2 + phase) * amp);
       }
       const even = Math.round(y / rowPitch) % 2 === 0;
       ctx.strokeStyle = even ? 'rgba(210,165,45,0.48)' : 'rgba(50,28,0,0.30)';
-      ctx.lineWidth = 0.88; ctx.stroke();
+      ctx.lineWidth = Math.min(0.88, rowPitch * 0.1 + 0.4); ctx.stroke();
     }
     // Subtle secondary grid (cross-feed direction)
-    for (let y = 0; y < H; y += step * 2.1) {
+    for (let y = 0; y < H; y += rowPitch * 2.1) {
       ctx.strokeStyle = 'rgba(195,150,28,0.10)';
       ctx.lineWidth = 0.4;
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
