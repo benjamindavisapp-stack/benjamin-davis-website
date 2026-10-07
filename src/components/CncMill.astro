@@ -302,11 +302,15 @@
     // glyph — the tool spirals toward the text instead of raking back and
     // forth blind to its shape.
     const roughPath1 = buildContourRings(inkDist, Math.max(R1, maxDist - R1 * 0.5), R1, R1);
-    // Pass 2: continue inward from where pass 1 left off, down to R2.
-    // Levels between R1 and R2 only produce contour crossings close to the
-    // letters (anything farther was already cleared by pass 1), so this
-    // naturally stays local without an explicit y-band restriction.
-    const roughPath2 = buildContourRings(inkDist, R1, R2, R2);
+    // Pass 2: continue inward from pass 1, down to R2. Start strictly
+    // inside R1, not at it — pass 1's own last ring already traced that
+    // exact contour, so starting fromLevel at R1 here would retrace it a
+    // second time (visible as the letters flashing into view twice right
+    // where the two passes meet). Since R2 = R1/2 there's only room for
+    // this one ring anyway; levels this close to the letters only produce
+    // crossings near them (anything farther was already cleared by pass 1),
+    // so this naturally stays local without an explicit y-band restriction.
+    const roughPath2 = buildContourRings(inkDist, R2, R2, R2);
     // Finishing: one tight ring hugging the true profile, R4 plus clearance
     // out — every glyph's outer silhouette and every enclosed counter.
     const finOuterPath = buildContourRings(inkDist, R4 + 1, R4 + 1, R4);
