@@ -96,19 +96,22 @@
     const R1     = R;          // pass 1: roughing endmill radius
     const R2     = R / 2;      // pass 2: semi-finish endmill radius
     const R4     = R / 4;      // pass 3: finishing endmill radius
-    const FEED_R = W * 2.80;   // roughing feed px/s
-    const FEED_SF = W * 2.00;  // semi-finish feed px/s (pass 2, smaller tool)
-    const FEED_F = W * 1.30;   // finishing feed px/s
-    const RAPID  = W * 5.0;    // traverse speed px/s
+    const SPEED  = 2;           // overall animation speed multiplier
+    const FEED_R = W * 2.80 * SPEED;   // roughing feed px/s
+    const FEED_SF = W * 2.00 * SPEED;  // semi-finish feed px/s (pass 2, smaller tool)
+    const FEED_F = W * 1.30 * SPEED;   // finishing feed px/s
+    const RAPID  = W * 5.0 * SPEED;    // traverse speed px/s
     const SPIN   = Math.PI * 14;
     const SHX    = Math.ceil(R * 0.45);
     const SHY    = Math.ceil(R * 0.62);
 
     // Feed-rate response: how fast the simulated servo loop reaches a target
     // speed. Rapids snap faster than cutting feeds — no cutting load to
-    // fight through — matching real controller acceleration limits.
-    const RATE_FEED  = 11;  // 1/s — time constant ≈ 90ms
-    const RATE_RAPID = 17;  // 1/s — time constant ≈ 59ms
+    // fight through — matching real controller acceleration limits. Scaled
+    // with SPEED too, so ramps stay a fixed fraction of travel time rather
+    // than eating a bigger share of a now-shorter move.
+    const RATE_FEED  = 11 * SPEED;  // 1/s — time constant ≈ 90ms
+    const RATE_RAPID = 17 * SPEED;  // 1/s — time constant ≈ 59ms
 
     /* ── Pre-render: brass top surface ───────────────────────────────────── */
     const brassOff = mkCanvas(PW, PH);
@@ -848,7 +851,7 @@
 
       /* ── APPROACH ────────────────────────────────────────────────────── */
       if (phase === 'approach') {
-        appT = Math.min(appT + dt / 0.55, 1);
+        appT = Math.min(appT + dt / (0.55 / SPEED), 1);
         const ease = appT * appT * (3 - 2 * appT);
         tx = W / 2 + (approachDest.x - W / 2) * ease;
         ty = -R1 * 4 + (approachDest.y - (-R1 * 4)) * ease;
@@ -951,7 +954,7 @@
       else if (phase === 'settle') {
         lifted = true; cutting = false;
         settleT += dt;
-        if (settleT >= 0.38) phase = 'retract';
+        if (settleT >= 0.38 / SPEED) phase = 'retract';
       }
 
       /* ── RETRACT ─────────────────────────────────────────────────────── */
