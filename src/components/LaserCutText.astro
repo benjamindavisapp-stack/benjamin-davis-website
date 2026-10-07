@@ -91,11 +91,17 @@ const lcId = id ?? ('lc-' + Math.random().toString(36).slice(2, 8));
     }
   }
 
-  /* ── Build per-letter contour path for cutting ────────────────────────── */
+  /* ── Build per-letter cut path via marching squares ────────────────────
+     A laser pierces once per enclosed contour, then traces its whole
+     boundary — every curve and serif, and every enclosed counter (the
+     bowls of B/D, the triangle of A) as its own separate pierce+cut, not a
+     per-column top/bottom envelope that misses every hole. Row bands are
+     still used to order the cuts top line first, left-to-right within it,
+     so a multi-line heading doesn't hop between lines mid-cut. */
   function buildCutPath(mpx: Uint8ClampedArray, W: number, H: number) {
     type P = { x: number; y: number; cut: boolean };
 
-    // Detect horizontal text-line bands so multi-line headings aren't bridged
+    // Detect horizontal text-line bands, purely to order the cuts sensibly.
     const rowHas = new Uint8Array(H);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
@@ -108,36 +114,107 @@ const lcId = id ?? ('lc-' + Math.random().toString(36).slice(2, 8));
       if (y < H && rowHas[y]) { if (!inB) { inB = true; bY0 = y; } }
       else if (inB) { bands.push({ y0: bY0, y1: y - 1 }); inB = false; }
     }
+    function bandOf(cy: number): number {
+      for (let i = 0; i < bands.length; i++) if (cy >= bands[i].y0 - 2 && cy <= bands[i].y1 + 2) return i;
+      let best = 0, bestD = Infinity;
+      bands.forEach((b, i) => { const d = Math.abs(cy - (b.y0 + b.y1) / 2); if (d < bestD) { bestD = d; best = i; } });
+      return best;
+    }
 
-    const ytA = new Int16Array(W).fill(-1);
-    const ybA = new Int16Array(W).fill(-1);
-    const path: P[] = [];
-
-    for (const band of bands) {
-      const lyt = new Int16Array(W).fill(-1);
-      const lyb = new Int16Array(W).fill(-1);
-      for (let x = 0; x < W; x++) {
-        for (let y = band.y0; y <= band.y1; y++) {
-          if (mpx[(y*W+x)*4] > 60) { if (lyt[x] < 0) lyt[x] = y; lyb[x] = y; }
+    type Seg = [number, number, number, number];
+    const level = 127;
+    const val = (x: number, y: number) => mpx[(y * W + x) * 4];
+    const interp = (xa: number, ya: number, va: number, xb: number, yb: number, vb: number): [number, number] => {
+      const t = (level - va) / (vb - va);
+      return [xa + (xb - xa) * t, ya + (yb - ya) * t];
+    };
+    const segs: Seg[] = [];
+    for (let y = 0; y < H - 1; y++) {
+      for (let x = 0; x < W - 1; x++) {
+        const v00 = val(x, y), v10 = val(x + 1, y), v11 = val(x + 1, y + 1), v01 = val(x, y + 1);
+        let idx = 0;
+        if (v00 > level) idx |= 1;
+        if (v10 > level) idx |= 2;
+        if (v11 > level) idx |= 4;
+        if (v01 > level) idx |= 8;
+        if (idx === 0 || idx === 15) continue;
+        const top    = () => interp(x, y, v00, x + 1, y, v10);
+        const right  = () => interp(x + 1, y, v10, x + 1, y + 1, v11);
+        const bottom = () => interp(x, y + 1, v01, x + 1, y + 1, v11);
+        const left   = () => interp(x, y, v00, x, y + 1, v01);
+        const add = (a: [number, number], b: [number, number]) => segs.push([a[0], a[1], b[0], b[1]]);
+        switch (idx) {
+          case 1: case 14: add(left(), top()); break;
+          case 2: case 13: add(top(), right()); break;
+          case 3: case 12: add(left(), right()); break;
+          case 4: case 11: add(right(), bottom()); break;
+          case 6: case 9:  add(top(), bottom()); break;
+          case 7: case 8:  add(left(), bottom()); break;
+          case 5: {
+            const c = (v00 + v10 + v11 + v01) / 4;
+            if (c > level) { add(left(), top()); add(right(), bottom()); }
+            else            { add(left(), bottom()); add(top(), right()); }
+            break;
+          }
+          case 10: {
+            const c = (v00 + v10 + v11 + v01) / 4;
+            if (c > level) { add(top(), right()); add(left(), bottom()); }
+            else            { add(left(), top()); add(right(), bottom()); }
+            break;
+          }
         }
-        if (lyt[x] >= 0) { ytA[x] = lyt[x]; ybA[x] = lyb[x]; }
-      }
-
-      const groups: { xl: number; xr: number }[] = [];
-      let gs = -1;
-      for (let x = 0; x <= W; x++) {
-        if (x < W && lyt[x] >= 0) { if (gs < 0) gs = x; }
-        else if (gs >= 0) { groups.push({ xl: gs, xr: x - 1 }); gs = -1; }
-      }
-      for (const { xl, xr } of groups) {
-        path.push({ x: xl, y: lyt[xl] - 2, cut: false });
-        for (let x = xl; x <= xr; x++) path.push({ x, y: lyt[x] - 1.5, cut: true });
-        path.push({ x: xr, y: lyb[xr] + 1.5, cut: true });
-        for (let x = xr - 1; x >= xl; x--) path.push({ x, y: lyb[x] + 1.5, cut: true });
-        path.push({ x: xl, y: lyt[xl] - 1.5, cut: true });
       }
     }
-    return { path, ytA, ybA };
+    // Stitch the unordered segment soup into closed loops by snapping
+    // shared endpoints to a quarter-pixel grid key.
+    const key = (x: number, y: number) => `${Math.round(x * 4)},${Math.round(y * 4)}`;
+    const bucket = new Map<string, number[]>();
+    segs.forEach((s, i) => {
+      for (const [px, py] of [[s[0], s[1]], [s[2], s[3]]] as [number, number][]) {
+        const k = key(px, py);
+        const arr = bucket.get(k);
+        if (arr) arr.push(i); else bucket.set(k, [i]);
+      }
+    });
+    const used = new Uint8Array(segs.length);
+    const loops: { x: number; y: number }[][] = [];
+    for (let i = 0; i < segs.length; i++) {
+      if (used[i]) continue;
+      used[i] = 1;
+      const loop: { x: number; y: number }[] = [{ x: segs[i][0], y: segs[i][1] }, { x: segs[i][2], y: segs[i][3] }];
+      let endX = segs[i][2], endY = segs[i][3];
+      let guard = 0;
+      while (guard++ < segs.length + 5) {
+        const candidates = bucket.get(key(endX, endY)) || [];
+        const next = candidates.find(j => !used[j]);
+        if (next === undefined) break;
+        used[next] = 1;
+        const s = segs[next];
+        const d0 = Math.hypot(s[0] - endX, s[1] - endY), d1 = Math.hypot(s[2] - endX, s[3] - endY);
+        if (d0 <= d1) { endX = s[2]; endY = s[3]; } else { endX = s[0]; endY = s[1]; }
+        loop.push({ x: endX, y: endY });
+      }
+      if (loop.length >= 6) loops.push(loop);
+    }
+    // Order: top line first, left-to-right within a line — each enclosed
+    // contour (a letter's outline, or one of its counters) gets its own
+    // pierce, same as a real cutter would.
+    loops.sort((a, b) => {
+      const cyA = a.reduce((s, p) => s + p.y, 0) / a.length;
+      const cyB = b.reduce((s, p) => s + p.y, 0) / b.length;
+      const bA = bandOf(cyA), bB = bandOf(cyB);
+      if (bA !== bB) return bA - bB;
+      const cxA = a.reduce((s, p) => s + p.x, 0) / a.length;
+      const cxB = b.reduce((s, p) => s + p.x, 0) / b.length;
+      return cxA - cxB;
+    });
+
+    const path: P[] = [];
+    for (const loop of loops) {
+      path.push({ x: loop[0].x, y: loop[0].y, cut: false });
+      for (let i = 1; i < loop.length; i++) path.push({ x: loop[i].x, y: loop[i].y, cut: true });
+    }
+    return { path };
   }
 
   /* ── Glyph mask from live DOM (Range API) ─────────────────────────────── */
@@ -414,21 +491,22 @@ const lcId = id ?? ('lc-' + Math.random().toString(36).slice(2, 8));
     document.fonts.ready.then(() => {
       const mpx = buildMask(wrap, heading, W, H);
 
-      // Letter mask canvas
+      // Letter mask canvas — the real glyph mask, holes and all. A
+      // per-column top-to-bottom fill (the old approach) paints every
+      // counter solid, so B/D/O would cut and fall as solid blobs with no
+      // bowl however precisely the beam actually traces around them.
       const lMaskOff = mk(PW, PH);
       {
+        const raw = mk(W, H); // unscaled 1:1 — putImageData ignores transforms
+        const rc  = raw.getContext('2d')!;
+        const img = rc.createImageData(W, H);
+        img.data.set(mpx);
+        rc.putImageData(img, 0, 0);
         const c = lMaskOff.getContext('2d')!; c.scale(DPR, DPR);
-        c.fillStyle = '#fff';
-        for (let x = 0; x < W; x++) {
-          let yt = -1, yb = -1;
-          for (let y = 0; y < H; y++) {
-            if (mpx[(y*W+x)*4] > 60) { if (yt < 0) yt = y; yb = y; }
-          }
-          if (yt >= 0) c.fillRect(x, yt, 1, yb - yt + 1);
-        }
+        c.drawImage(raw, 0, 0, W, H);
       }
 
-      const { path, ytA, ybA } = buildCutPath(mpx, W, H);
+      const { path } = buildCutPath(mpx, W, H);
 
       // Pre-compute total cut length and trace speed
       let totalLen = 0;

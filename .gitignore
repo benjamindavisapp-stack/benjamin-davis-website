@@ -9,4 +9,5 @@ cnc-verify.mjs
 cnc-watch.mjs
 cnc-zoom.mjs
 sls-watch.mjs
+lc-watch.mjs
 dev.log
