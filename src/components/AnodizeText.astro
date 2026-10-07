@@ -56,6 +56,9 @@ const anoId = id ?? ('ano-' + Math.random().toString(36).slice(2, 8));
   const MAX_BUBS = 60;
 
   /* ── Dye colour palette ───────────────────────────────────────────────── */
+  const WAVE_AMP  = 5;    // dye-front waviness (px) — bath turbulence, not a flat line
+  const WAVE_FREQ = 0.09; // spatial frequency of the wave along Y
+
   const DYE: Record<string, string> = {
     accent:  '#c07030',
     blue:    '#1a58a8',
@@ -225,6 +228,7 @@ const anoId = id ?? ('ano-' + Math.random().toString(36).slice(2, 8));
       let dyeP       = 0;   // 0→1 controls dye opacity (uniform deepening)
       let oxideT     = 0;   // 0→1 oxide layer growth during electrolysis
       let finF       = 0;   // 0→1 controls iridescence
+      let wavePhase  = 0;   // slow drift so the dye front's waviness isn't static
       let lastTs: number | null = null;
       let startTs    = 0;
 
@@ -239,7 +243,7 @@ const anoId = id ?? ('ano-' + Math.random().toString(36).slice(2, 8));
       }
 
       /* ── Per-frame composite ─────────────────────────────────────── */
-      function composite(dp: number, ff: number) {
+      function composite(dp: number, ff: number, wavePhase: number) {
         bCtx.clearRect(0, 0, W, H);
 
         // Layer 1: brushed-aluminium letters
@@ -253,7 +257,9 @@ const anoId = id ?? ('ano-' + Math.random().toString(36).slice(2, 8));
           bCtx.globalCompositeOperation = 'source-over';
         }
 
-        // Layer 2: immersion dye — uniform simultaneous deepening, no wavefront
+        // Layer 2: immersion dye — a wavy front floods left→right as dye
+        // uptake tracks immersion depth and bath turbulence, not a uniform
+        // fade that would imply every letter absorbing dye in lockstep.
         if (dp > 0) {
           t1Ctx.clearRect(0, 0, W, H);
           t1Ctx.drawImage(dyeOff, 0, 0, W, H);
@@ -261,9 +267,39 @@ const anoId = id ?? ('ano-' + Math.random().toString(36).slice(2, 8));
           t1Ctx.drawImage(accOff, 0, 0, W, H);
           t1Ctx.globalCompositeOperation = 'source-over';
 
-          bCtx.globalAlpha = dp * 0.92;
+          bCtx.save();
+          let sweepX = W;
+          if (dp < 1) {
+            sweepX = dp * (W + WAVE_AMP * 2) - WAVE_AMP;
+            bCtx.beginPath();
+            bCtx.moveTo(0, 0);
+            for (let y = 0; y <= H; y += 3) {
+              const fx = sweepX + Math.sin(y * WAVE_FREQ + wavePhase) * WAVE_AMP;
+              bCtx.lineTo(Math.max(0, Math.min(W, fx)), y);
+            }
+            bCtx.lineTo(0, H);
+            bCtx.closePath();
+            bCtx.clip();
+          }
+          bCtx.globalAlpha = 0.92;
           bCtx.drawImage(t1Off, 0, 0, W, H);
           bCtx.globalAlpha = 1;
+          bCtx.restore();
+
+          // Leading-edge concentration band — freshest dye solution reads
+          // slightly richer right at the advancing front.
+          if (dp < 1) {
+            bCtx.save();
+            const edge = bCtx.createLinearGradient(sweepX - WAVE_AMP - 10, 0, sweepX + WAVE_AMP + 2, 0);
+            edge.addColorStop(0, 'rgba(0,0,0,0)');
+            edge.addColorStop(0.7, `rgba(255,255,255,${(0.10).toFixed(2)})`);
+            edge.addColorStop(1, 'rgba(0,0,0,0)');
+            bCtx.globalCompositeOperation = 'source-atop';
+            bCtx.fillStyle = edge;
+            bCtx.fillRect(0, 0, W, H);
+            bCtx.globalCompositeOperation = 'source-over';
+            bCtx.restore();
+          }
         }
 
         // Layer 3: satin iridescence — subtle metallic sheen over sealed oxide
@@ -353,7 +389,8 @@ const anoId = id ?? ('ano-' + Math.random().toString(36).slice(2, 8));
           finF = pt;
         }
 
-        composite(dyeP, finF);
+        wavePhase += dt * 1.1;
+        composite(dyeP, finF, wavePhase);
         if (bubbles.length > 0) drawBubbles(bCtx, bubbles);
 
         if (pct >= 1) { finalise(); return; }
