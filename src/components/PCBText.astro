@@ -1,8 +1,9 @@
 ---
 // PCBText.astro — PCB/circuit-board text reveal.
 // Wraps any heading; on scroll-into-view it fabricates the text as copper
-// traces on an FR4 board: trace routing → copper pour → vias → soldermask
-// sweep → silkscreen + ENIG pads + optional LED glow.
+// traces on an FR4 board: the routing head cuts a bare channel first
+// (outline, then interiors) → copper flows in to fill it, left→right →
+// vias → soldermask sweep → silkscreen + ENIG pads + optional LED glow.
 // Real heading stays in DOM (correct tag/level); canvas is aria-hidden.
 //
 //   <PCBText id="contact-hero" duration={3.5} delay={0.4}>
@@ -136,6 +137,27 @@ const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
     hl.addColorStop(0, 'rgba(255,205,130,0.28)');
     hl.addColorStop(1, 'rgba(255,180,70,0)');
     ctx.fillStyle = hl; ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ── Cut channel — recessed, routed FR4 before copper fills it ─────────── */
+  function renderGroove(ctx: CanvasRenderingContext2D, W: number, H: number) {
+    // A darkening veil over the bare board reads as a milled recess —
+    // the board's own fiber-weave texture still shows through, just
+    // shadowed, like a real routed channel.
+    ctx.fillStyle = 'rgba(0,0,0,0.58)';
+    ctx.fillRect(0, 0, W, H);
+    // Exposed fiberglass/resin flecks catching light at the cut surface
+    const n = Math.floor(W * H * 0.004);
+    for (let i = 0; i < n; i++) {
+      const x = Math.random() * W, y = Math.random() * H;
+      ctx.fillStyle = `rgba(205,198,182,${(Math.random() * 0.10 + 0.02).toFixed(3)})`;
+      ctx.fillRect(x, y, 0.8, 0.8);
+    }
+    // Top-edge rim highlight — catches light at the channel's near wall
+    const rim = ctx.createLinearGradient(0, 0, 0, 3);
+    rim.addColorStop(0, 'rgba(255,255,255,0.10)');
+    rim.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = rim; ctx.fillRect(0, 0, W, 3);
   }
 
   /* ── Glyph pixel mask (same Range API pattern as FDMText / SLSText) ──── */
@@ -879,10 +901,14 @@ const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
     { const c = boardOff.getContext('2d')!; c.scale(DPR, DPR); renderBoard(c, W, H, MC); }
     const copperOff = mk(PW, PH);
     { const c = copperOff.getContext('2d')!; c.scale(DPR, DPR); renderCopper(c, W, H); }
+    const grooveOff = mk(PW, PH);
+    { const c = grooveOff.getContext('2d')!; c.scale(DPR, DPR); renderGroove(c, W, H); }
 
-    // Accumulation canvas: grows as copper is routed/poured (white = copper present)
-    const accOff = mk(PW, PH);
-    const acCtx  = accOff.getContext('2d')!; acCtx.scale(DPR, DPR);
+    // Accumulation canvas: grows as the board is routed/poured — tracks the
+    // cut channel's extent (white = cut). Copper doesn't fill it until the
+    // later 'fill' phase sweeps across this same shape.
+    const cutAccOff = mk(PW, PH);
+    const cuAcCtx   = cutAccOff.getContext('2d')!; cuAcCtx.scale(DPR, DPR);
 
     // Scratch canvas for destination-in compositing
     const tmpOff = mk(PW, PH);
@@ -939,23 +965,26 @@ const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
       }
 
       /* ── Phase schedule ──────────────────────────────────────────────
-         board  0.00–0.08  FR4 board fades in
-         trace  0.08–0.56  routing head traces glyph outlines (45°/90°)
-         pour   0.56–0.68  copper flood pour fills letter bodies
-         via    0.68–0.76  plated vias punch in (staggered)
-         mask   0.76–0.87  soldermask sweeps left→right
-         finish 0.87–1.00  silkscreen + ENIG pads + LED glow
+         board    0.00–0.08  FR4 board fades in
+         cut      0.08–0.46  routing head cuts the channel — glyph outlines
+                              (45°/90°), bare board, no copper yet
+         cutpour  0.46–0.56  the cut widens to fill letter interiors too
+         fill     0.56–0.66  copper flows into the finished channel, L→R
+         via      0.66–0.74  plated vias punch in (staggered)
+         mask     0.74–0.85  soldermask sweeps left→right
+         finish   0.85–1.00  silkscreen + ENIG pads + LED glow
       ─────────────────────────────────────────────────────────────────*/
       const phases = [
-        { name: 'board',  t0: 0.00, t1: 0.08 },
-        { name: 'trace',  t0: 0.08, t1: 0.56 },
-        { name: 'pour',   t0: 0.56, t1: 0.68 },
-        { name: 'via',    t0: 0.68, t1: 0.76 },
-        { name: 'mask',   t0: 0.76, t1: 0.87 },
-        { name: 'finish', t0: 0.87, t1: 1.00 },
+        { name: 'board',   t0: 0.00, t1: 0.08 },
+        { name: 'cut',     t0: 0.08, t1: 0.46 },
+        { name: 'cutpour', t0: 0.46, t1: 0.56 },
+        { name: 'fill',    t0: 0.56, t1: 0.66 },
+        { name: 'via',     t0: 0.66, t1: 0.74 },
+        { name: 'mask',    t0: 0.74, t1: 0.85 },
+        { name: 'finish',  t0: 0.85, t1: 1.00 },
       ];
-      const traceDurSec = (0.56 - 0.08) * DUR / 1000;
-      const pourDurSec  = (0.68 - 0.56) * DUR / 1000;
+      const traceDurSec = (0.46 - 0.08) * DUR / 1000;
+      const pourDurSec  = (0.56 - 0.46) * DUR / 1000;
 
       // Animation state
       let phaseIdx   = 0;
@@ -963,7 +992,7 @@ const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
       let pIdx       = 0, pT     = 0;   // pour position
       let routeX     = qPath.length ? qPath[0][0] : W/2;
       let routeY     = qPath.length ? qPath[0][1] : H/2;
-      let maskF      = 0, finishF = 0, fidF = 0;
+      let maskF      = 0, finishF = 0, fidF = 0, fillF = 0;
       const viaAlphas = new Array<number>(vias.length).fill(0);
       let viaSnapped = false;
       let lastTs: number | null = null;
@@ -974,13 +1003,43 @@ const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
         bCtx.clearRect(0, 0, W, H);
         // Layer 1 — FR4 board
         bCtx.drawImage(boardOff, 0, 0, W, H);
-        // Layer 2 — copper texture, masked to accumulated routed area
+        // Layer 2 — the routed channel: a dark recessed groove, masked to
+        // the accumulated cut area (whatever's been routed/poured so far).
         tmCtx.clearRect(0, 0, W, H);
-        tmCtx.drawImage(copperOff, 0, 0, W, H);
+        tmCtx.drawImage(grooveOff, 0, 0, W, H);
         tmCtx.globalCompositeOperation = 'destination-in';
-        tmCtx.drawImage(accOff, 0, 0, W, H);
+        tmCtx.drawImage(cutAccOff, 0, 0, W, H);
         tmCtx.globalCompositeOperation = 'source-over';
         bCtx.drawImage(tmpOff, 0, 0, W, H);
+        // Layer 2a — copper, flowing in left→right over the already-cut
+        // channel (not before it — the groove must exist first).
+        if (fillF > 0) {
+          const sweepX = Math.min(W, eio(fillF) * (W + 10) - 5);
+          if (sweepX > 0) {
+            tmCtx.clearRect(0, 0, W, H);
+            tmCtx.drawImage(copperOff, 0, 0, W, H);
+            tmCtx.globalCompositeOperation = 'destination-in';
+            tmCtx.drawImage(cutAccOff, 0, 0, W, H);
+            tmCtx.globalCompositeOperation = 'source-over';
+            bCtx.save();
+            bCtx.beginPath(); bCtx.rect(0, 0, sweepX, H); bCtx.clip();
+            bCtx.drawImage(tmpOff, 0, 0, W, H);
+            bCtx.restore();
+            // Molten leading edge — bright, hot front as copper advances
+            if (fillF < 1) {
+              const led = bCtx.createLinearGradient(sweepX - 12, 0, sweepX + 4, 0);
+              led.addColorStop(0,    'rgba(0,0,0,0)');
+              led.addColorStop(0.35, 'rgba(255,210,140,0.55)');
+              led.addColorStop(0.75, 'rgba(255,170,70,0.40)');
+              led.addColorStop(1,    'rgba(0,0,0,0)');
+              bCtx.save();
+              bCtx.beginPath(); bCtx.rect(0, 0, Math.min(W, sweepX + 4), H); bCtx.clip();
+              bCtx.fillStyle = led;
+              bCtx.fillRect(Math.max(0, sweepX - 12), 0, 16, H);
+              bCtx.restore();
+            }
+          }
+        }
         // Layer 2b — teardrop fillets (copper colour, before soldermask)
         for (let i = 0; i < vias.length; i++) {
           const a = viaAlphas[i];
@@ -1011,21 +1070,21 @@ const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
         }
       }
 
-      /* ── Draw one trace segment on the accumulation canvas ───────────── */
+      /* ── Cut one trace segment into the routed-channel accumulation ──── */
       function routeTrace(x0: number, y0: number, x1: number, y1: number) {
-        acCtx.save();
-        acCtx.strokeStyle = '#fff'; acCtx.lineWidth = TRACE_W;
-        acCtx.lineCap = 'butt'; acCtx.lineJoin = 'miter';
-        acCtx.beginPath(); acCtx.moveTo(x0, y0); acCtx.lineTo(x1, y1); acCtx.stroke();
-        acCtx.restore();
+        cuAcCtx.save();
+        cuAcCtx.strokeStyle = '#fff'; cuAcCtx.lineWidth = TRACE_W;
+        cuAcCtx.lineCap = 'butt'; cuAcCtx.lineJoin = 'miter';
+        cuAcCtx.beginPath(); cuAcCtx.moveTo(x0, y0); cuAcCtx.lineTo(x1, y1); cuAcCtx.stroke();
+        cuAcCtx.restore();
       }
 
-      /* ── Deposit a pour spot at (x, y) ──────────────────────────────── */
+      /* ── Cut a pour spot at (x, y) into the routed-channel accumulation ─ */
       function pourAt(x: number, y: number) {
-        acCtx.save();
-        acCtx.fillStyle = '#fff';
-        acCtx.beginPath(); acCtx.arc(x, y, POUR_PITCH/2 + 0.5, 0, Math.PI*2); acCtx.fill();
-        acCtx.restore();
+        cuAcCtx.save();
+        cuAcCtx.fillStyle = '#fff';
+        cuAcCtx.beginPath(); cuAcCtx.arc(x, y, POUR_PITCH/2 + 0.5, 0, Math.PI*2); cuAcCtx.fill();
+        cuAcCtx.restore();
       }
 
       function finalise() {
@@ -1058,9 +1117,12 @@ const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
         const ph = phases[phaseIdx];
         const pt = ph.t1 > ph.t0 ? Math.min(1, (pct - ph.t0) / (ph.t1 - ph.t0)) : 1;
 
-        // On first frame of via phase: snap full copper pour to guarantee complete fill
+        // On first frame of via phase: snap the full channel + copper fill
+        // to guarantee both are complete, regardless of routing/pour/fill
+        // timing in the phases before it.
         if (ph.name === 'via' && !viaSnapped) {
-          acCtx.drawImage(maskFull, 0, 0, W, H);
+          cuAcCtx.drawImage(maskFull, 0, 0, W, H);
+          fillF = 1;
           viaSnapped = true;
         }
 
@@ -1074,8 +1136,8 @@ const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
           bCtx.globalAlpha = 1;
           drawFiducials(bCtx, W, H, fidF, BOARD_BG[MC] || BOARD_BG.green);
 
-        /* ── TRACE ROUTING (45°/90° PCB routing head) ───────────────────── */
-        } else if (ph.name === 'trace') {
+        /* ── CUT: routing head cuts the channel (45°/90°), no copper yet ── */
+        } else if (ph.name === 'cut') {
           if (qPath.length > 1 && traceLen > 0.1) {
             const spd = traceLen / traceDurSec;
             let rem = spd * dt;
@@ -1107,8 +1169,8 @@ const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
           composite();
           drawRoutingHead(fCtx, routeX, routeY, routingAge, W, H);
 
-        /* ── COPPER POUR (flood fill scan lines) ────────────────────────── */
-        } else if (ph.name === 'pour') {
+        /* ── CUTPOUR: the cut widens to clear letter interiors too ───────── */
+        } else if (ph.name === 'cutpour') {
           if (pIdx < pourSegs.length && pourLen > 0.1) {
             const spd = pourLen / pourDurSec;
             let rem = spd * dt;
@@ -1130,6 +1192,11 @@ const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
           }
           composite();
           drawRoutingHead(fCtx, routeX, routeY, routingAge, W, H);
+
+        /* ── FILL: copper flows into the finished channel, left→right ────── */
+        } else if (ph.name === 'fill') {
+          fillF = pt;
+          composite();
 
         /* ── VIAS PUNCH IN (staggered, with scale animation) ─────────────── */
         } else if (ph.name === 'via') {

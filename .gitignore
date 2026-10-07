@@ -11,4 +11,5 @@ cnc-zoom.mjs
 sls-watch.mjs
 lc-watch.mjs
 ano-watch.mjs
+pcb-watch.mjs
 dev.log
