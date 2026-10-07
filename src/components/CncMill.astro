@@ -21,8 +21,15 @@
   .cnc-stock { z-index: 10; }
   .cnc-fx    { z-index: 11; }
 
-  /* Canvas provides the name visual — keep h1 in DOM for a11y/SEO only */
-  :global(.cnc-nameplate .np-name) {
+  /* Canvas provides the name visual — keep h1 in DOM for a11y/SEO only.
+     Tied to the static `.nameplate` class (present from first paint), not
+     a JS-added one — hiding that depended on JS running first left a real
+     window, between initial paint and script execution, where the plain
+     DOM heading could render before being hidden. Right as the canvas
+     then drew its own styled version, that read as the name appearing
+     twice. The tiny-screen fallback below explicitly un-hides this when
+     the canvas doesn't render at all. */
+  :global(.nameplate .np-name) {
     visibility: hidden;
   }
 
@@ -55,7 +62,6 @@
     const fxEl    = document.querySelector<HTMLCanvasElement>('.cnc-fx');
     if (!stockEl || !fxEl) return;
     const parent = stockEl.parentElement!;
-    parent.classList.add('cnc-nameplate');
     document.fonts.ready.then(() => setup(stockEl, fxEl, parent));
   }
 
@@ -65,7 +71,8 @@
     const W = Math.floor(rect.width);
     const H = Math.floor(rect.height);
     if (W < 100 || H < 60) {
-      parent.classList.remove('cnc-nameplate'); // let h1 show on tiny screens
+      const heading = parent.querySelector<HTMLElement>('.np-name');
+      if (heading) heading.style.visibility = 'visible'; // canvas won't render — show the real text
       showDone(stockEl, fxEl, parent);
       return;
     }
