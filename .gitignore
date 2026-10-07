@@ -8,4 +8,5 @@ cnc-dims.mjs
 cnc-verify.mjs
 cnc-watch.mjs
 cnc-zoom.mjs
+sls-watch.mjs
 dev.log
