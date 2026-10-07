@@ -194,7 +194,20 @@ const lcId = id ?? ('lc-' + Math.random().toString(36).slice(2, 8));
         if (d0 <= d1) { endX = s[2]; endY = s[3]; } else { endX = s[0]; endY = s[1]; }
         loop.push({ x: endX, y: endY });
       }
-      if (loop.length >= 6) loops.push(loop);
+      // Discard noise: font antialiasing can cross the threshold in tiny
+      // isolated patches near an edge, each masquerading as its own
+      // contour. A point-count filter alone doesn't catch these (the
+      // gradient can be wide enough to produce several points on a loop
+      // a fraction of a pixel across) — filter by actual size instead, so
+      // every real pierce (even a small one, like the dot on an "i")
+      // survives while sub-pixel noise doesn't silently inflate the pierce
+      // count and starve every shape's dwell budget.
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const p of loop) {
+        if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+      }
+      if (loop.length >= 6 && Math.hypot(maxX - minX, maxY - minY) >= 1.5) loops.push(loop);
     }
     // Order: top line first, left-to-right within a line — each enclosed
     // contour (a letter's outline, or one of its counters) gets its own
@@ -524,7 +537,26 @@ const lcId = id ?? ('lc-' + Math.random().toString(36).slice(2, 8));
       ];
       const DUR_S   = DUR / 1000;
       const traceD  = DUR_S * (phases[1].t1 - phases[1].t0);
-      const traceSpd = totalLen / traceD;
+
+      // Real cutters pause briefly to pierce before each new contour. With
+      // many small enclosed shapes (bowls, counters, dots on an "i") that
+      // adds up fast — a fixed 0.28s dwell per shape was silently eating
+      // the whole trace-phase budget before the beam ever finished moving,
+      // so the phase force-advanced on its own timer with the cut still
+      // incomplete. Budget dwell time explicitly against the shape count
+      // so movement + every pierce always fits inside traceD exactly,
+      // however many separate contours the glyph set breaks into.
+      const numPierces = path.reduce((n, p) => n + (p.cut ? 0 : 1), 0);
+      const minMoveFrac = 0.35; // cutting motion keeps at least this share of the phase
+      const dwellBudget = traceD * (1 - minMoveFrac);
+      // No minimum floor here deliberately — a floor can push total dwell
+      // time back over budget when there are many shapes, which is exactly
+      // the bug this is fixing. Letting it shrink freely (just capped at a
+      // sensible max for the few-shape case) keeps movement + every pierce
+      // summing to traceD exactly, no matter how many contours there are.
+      const pierceDwellDur = numPierces > 0 ? Math.min(0.28, dwellBudget / numPierces) : 0.28;
+      const moveTimeAvail = Math.max(0.3, traceD - pierceDwellDur * numPierces);
+      const traceSpd = totalLen / moveTimeAvail;
 
       // Beam state
       let beamX = path[0]?.x ?? W * 0.5;
@@ -532,11 +564,12 @@ const lcId = id ?? ('lc-' + Math.random().toString(36).slice(2, 8));
       let traceIdx  = 0;
       let traceDist = 0;
       let pierceDwell = 0;
+      let carryRem  = 0; // movement budget left over when a frame ends mid-pierce
       let beamDX = 0, beamDY = 1;
 
       let phaseIdx  = 0;
       let lastTs: number | null = null;
-      let startTs   = 0;
+      let simTime   = 0; // accumulated from the same clamped dt the beam moves by
 
       function finalise() {
         fxEl.style.display  = 'none';
@@ -562,9 +595,16 @@ const lcId = id ?? ('lc-' + Math.random().toString(36).slice(2, 8));
 
       function frame(ts: number) {
         if (!lastTs) lastTs = ts;
-        const dt      = Math.min((ts - lastTs) / 1000, 0.05);
-        lastTs        = ts;
-        const elapsed = Math.min((ts - startTs) / 1000, DUR_S);
+        const dt = Math.min((ts - lastTs) / 1000, 0.05);
+        lastTs   = ts;
+        // Phase progress must be driven off the same clamped dt the beam
+        // actually moves by — using raw wall-clock elapsed time here let
+        // the two fall out of sync on any slow/dropped frame (dt capped at
+        // 50ms, but real elapsed time could be much more), so the phase
+        // would force-advance on the real clock while the beam's own
+        // simulated clock was still behind, cutting the trace off early.
+        simTime += dt;
+        const elapsed = Math.min(simTime, DUR_S);
         const pct     = elapsed / DUR_S;
 
         while (phaseIdx < phases.length - 1 && pct >= phases[phaseIdx].t1) phaseIdx++;
@@ -573,23 +613,41 @@ const lcId = id ?? ('lc-' + Math.random().toString(36).slice(2, 8));
 
         // ── Trace phase: advance beam ──────────────────────────────────── //
         if (ph.name === 'trace' && totalLen > 0) {
+          // A frame's dt is split between finishing any dwell still owed
+          // and spending whatever's left on movement — in the SAME frame.
+          // Treating dwell and movement as mutually exclusive per-frame
+          // (the old `if dwelling else move` shape) always rounded dt up
+          // to whichever one was active, so a dwell ending partway through
+          // a frame threw away the leftover instead of using it to move;
+          // with ~dozens of pierces (every counter, every dot) that waste
+          // compounded into a large chunk of the whole path never getting
+          // traced before the phase's timer ran out.
+          let frameDt = dt;
           if (pierceDwell > 0) {
-            pierceDwell -= dt;
-            emitPierceSparks(beamX, beamY, dt);
-            emitSmoke(beamX, beamY, dt);
-          } else {
-            let rem = traceSpd * dt;
+            const used = Math.min(pierceDwell, frameDt);
+            pierceDwell -= used;
+            frameDt -= used;
+            emitPierceSparks(beamX, beamY, used);
+            emitSmoke(beamX, beamY, used);
+          }
+          if (frameDt > 1e-6 && pierceDwell <= 0) {
+            // Also carry forward any movement budget left over from a
+            // frame that ended mid-pierce (below), for the same reason.
+            let rem = traceSpd * frameDt + carryRem;
+            carryRem = 0;
             while (rem > 0 && traceIdx < path.length - 1) {
               const p0 = path[traceIdx];
               const p1 = path[traceIdx + 1];
               if (!p1.cut) {
                 beamX = p1.x; beamY = p1.y;
                 traceIdx++; traceDist = 0;
-                pierceDwell = 0.28;
-                rem = 0; break;
+                pierceDwell = pierceDwellDur;
+                carryRem = rem; rem = 0; break;
               }
               const segLen = Math.hypot(p1.x - p0.x, p1.y - p0.y);
-              if (segLen < 0.01) { traceIdx++; traceDist = 0; continue; }
+              if (!(segLen >= 0.01)) {
+                traceIdx++; traceDist = 0; continue;
+              }
               const remSeg = segLen - traceDist;
               const sf = traceDist / segLen, ef = (traceDist + Math.min(rem, remSeg)) / segLen;
               const sx = lerp(p0.x, p1.x, sf), sy = lerp(p0.y, p1.y, sf);
@@ -604,8 +662,8 @@ const lcId = id ?? ('lc-' + Math.random().toString(36).slice(2, 8));
                 traceDist += rem; rem = 0;
               }
             }
-            emitSparks(beamX, beamY, dt, MAT, beamDX, beamDY);
-            emitSmoke(beamX, beamY, dt);
+            emitSparks(beamX, beamY, frameDt, MAT, beamDX, beamDY);
+            emitSmoke(beamX, beamY, frameDt);
           }
         }
 
@@ -662,7 +720,7 @@ const lcId = id ?? ('lc-' + Math.random().toString(36).slice(2, 8));
         requestAnimationFrame(frame);
       }
 
-      setTimeout(() => { startTs = performance.now(); requestAnimationFrame(frame); }, DELAY);
+      setTimeout(() => { requestAnimationFrame(frame); }, DELAY);
     });
   }
 
