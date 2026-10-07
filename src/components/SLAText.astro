@@ -178,27 +178,98 @@ const slaId = id ?? ('sla-' + Math.random().toString(36).slice(2, 8));
     return mpx[(yi*W + xi)*4] > 60;
   }
 
-  /* ── Contour: bottom-edge L→R, top-edge R→L ──────────────────────────────── */
+  /* ── True per-letter contour via marching squares ─────────────────────────
+     A UV contour pass in real SLA traces each part's actual boundary —
+     every curve and serif, and every enclosed counter (the bowls of B/D,
+     the triangle of A) — not a bounding envelope that bridges straight
+     across the gaps between letters. Marching squares on the glyph mask
+     gives exactly that: every closed ink/background boundary, outer
+     silhouettes and inner holes alike, as one unified set of loops. */
   function extractContour(mpx: Uint8ClampedArray, W: number, H: number) {
     type P = { x: number; y: number; gap?: true };
-    const bot: P[] = [], top: P[] = [];
-    for (let x = 0; x < W; x++) {
-      let yt = -1, yb = -1;
-      for (let y = 0; y < H; y++) {
-        if (mpx[(y*W+x)*4] > 60) { if (yt < 0) yt = y; yb = y; }
+    type Seg = [number, number, number, number];
+    const level = 127;
+    const val = (x: number, y: number) => mpx[(y * W + x) * 4];
+    const interp = (xa: number, ya: number, va: number, xb: number, yb: number, vb: number): [number, number] => {
+      const t = (level - va) / (vb - va);
+      return [xa + (xb - xa) * t, ya + (yb - ya) * t];
+    };
+    const segs: Seg[] = [];
+    for (let y = 0; y < H - 1; y++) {
+      for (let x = 0; x < W - 1; x++) {
+        const v00 = val(x, y), v10 = val(x + 1, y), v11 = val(x + 1, y + 1), v01 = val(x, y + 1);
+        let idx = 0;
+        if (v00 > level) idx |= 1;
+        if (v10 > level) idx |= 2;
+        if (v11 > level) idx |= 4;
+        if (v01 > level) idx |= 8;
+        if (idx === 0 || idx === 15) continue;
+        const top    = () => interp(x, y, v00, x + 1, y, v10);
+        const right  = () => interp(x + 1, y, v10, x + 1, y + 1, v11);
+        const bottom = () => interp(x, y + 1, v01, x + 1, y + 1, v11);
+        const left   = () => interp(x, y, v00, x, y + 1, v01);
+        const add = (a: [number, number], b: [number, number]) => segs.push([a[0], a[1], b[0], b[1]]);
+        switch (idx) {
+          case 1: case 14: add(left(), top()); break;
+          case 2: case 13: add(top(), right()); break;
+          case 3: case 12: add(left(), right()); break;
+          case 4: case 11: add(right(), bottom()); break;
+          case 6: case 9:  add(top(), bottom()); break;
+          case 7: case 8:  add(left(), bottom()); break;
+          case 5: {
+            const c = (v00 + v10 + v11 + v01) / 4;
+            if (c > level) { add(left(), top()); add(right(), bottom()); }
+            else            { add(left(), bottom()); add(top(), right()); }
+            break;
+          }
+          case 10: {
+            const c = (v00 + v10 + v11 + v01) / 4;
+            if (c > level) { add(top(), right()); add(left(), bottom()); }
+            else            { add(left(), top()); add(right(), bottom()); }
+            break;
+          }
+        }
       }
-      if (yt >= 0) { bot.push({ x, y: yb+1.5 }); top.push({ x, y: yt-1.5 }); }
     }
-    const path: P[] = [];
-    for (let i = 0; i < bot.length; i++) {
-      if (i > 0 && bot[i].x - bot[i-1].x > 6) path.push({ ...bot[i], gap: true });
-      else path.push(bot[i]);
+    // Stitch the unordered segment soup into closed loops by snapping
+    // shared endpoints to a quarter-pixel grid key.
+    const key = (x: number, y: number) => `${Math.round(x * 4)},${Math.round(y * 4)}`;
+    const bucket = new Map<string, number[]>();
+    segs.forEach((s, i) => {
+      for (const [px, py] of [[s[0], s[1]], [s[2], s[3]]] as [number, number][]) {
+        const k = key(px, py);
+        const arr = bucket.get(k);
+        if (arr) arr.push(i); else bucket.set(k, [i]);
+      }
+    });
+    const used = new Uint8Array(segs.length);
+    const loops: P[][] = [];
+    for (let i = 0; i < segs.length; i++) {
+      if (used[i]) continue;
+      used[i] = 1;
+      const loop: P[] = [{ x: segs[i][0], y: segs[i][1], gap: true }, { x: segs[i][2], y: segs[i][3] }];
+      let endX = segs[i][2], endY = segs[i][3];
+      let guard = 0;
+      while (guard++ < segs.length + 5) {
+        const candidates = bucket.get(key(endX, endY)) || [];
+        const next = candidates.find(j => !used[j]);
+        if (next === undefined) break;
+        used[next] = 1;
+        const s = segs[next];
+        const d0 = Math.hypot(s[0] - endX, s[1] - endY), d1 = Math.hypot(s[2] - endX, s[3] - endY);
+        if (d0 <= d1) { endX = s[2]; endY = s[3]; } else { endX = s[0]; endY = s[1]; }
+        loop.push({ x: endX, y: endY });
+      }
+      if (loop.length >= 6) loops.push(loop);
     }
-    for (let i = top.length-1; i >= 0; i--) {
-      if (i < top.length-1 && top[i+1].x - top[i].x > 6) path.push({ ...top[i], gap: true });
-      else path.push(top[i]);
-    }
-    return path;
+    // Left-to-right order — the pass reads as outlining each glyph (and its
+    // counters) in sequence.
+    loops.sort((a, b) => {
+      const cxA = a.reduce((s, p) => s + p.x, 0) / a.length;
+      const cxB = b.reduce((s, p) => s + p.x, 0) / b.length;
+      return cxA - cxB;
+    });
+    return ([] as P[]).concat(...loops);
   }
 
   /* ── Angled hatch segments clipped to letter mask ─────────────────────────── */
