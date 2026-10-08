@@ -62,6 +62,17 @@
     const fxEl    = document.querySelector<HTMLCanvasElement>('.cnc-fx');
     if (!stockEl || !fxEl) return;
     const parent = stockEl.parentElement!;
+    // Belt-and-suspenders: the stylesheet rule above should already hide
+    // this from first paint with no JS dependency, but force it via inline
+    // style too, synchronously, as early as this script can possibly run.
+    // Inline style wins any cascade/specificity contest outright, so this
+    // guarantees the heading is hidden even if the stylesheet rule somehow
+    // isn't winning in some environment (a real report of a persistent
+    // second "BENJAMIN" — from the plain DOM heading sitting unhidden at
+    // its natural position — that this repo's own testing couldn't
+    // reproduce, so closing it this way rather than leaving it unresolved).
+    const heading = parent.querySelector<HTMLElement>('.np-name');
+    if (heading) heading.style.visibility = 'hidden';
     document.fonts.ready.then(() => setup(stockEl, fxEl, parent));
   }
 

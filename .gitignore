@@ -12,4 +12,5 @@ sls-watch.mjs
 lc-watch.mjs
 ano-watch.mjs
 pcb-watch.mjs
+cnc-audit.mjs
 dev.log
