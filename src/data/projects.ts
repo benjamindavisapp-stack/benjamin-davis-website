@@ -103,7 +103,7 @@ export const PROJECTS: Project[] = [
     summary:
       'The next machine fixes the three limits of the first: a DIY-ground auger with about ±0.2 mm tolerance, a 240 °C ceiling set by printed internal parts, and no way to make composite or core–shell filament. It adds CNC-machined augers, higher throughput, and coaxial filament — a PLA-CF core wrapped in a PLA sheath.',
     tags:      ['Research', 'Composites', 'Coaxial Filament', 'Machine Design'],
-    cover:     '/images/projects/gen2-auger.jpg',
+    cover:     '/images/projects/gen2-auger.webp',
     coverAlt:  'The first-generation DIY-ground compression auger on the workbench, the part Gen 2 replaces with a CNC-machined screw',
     highlight: 'Supported by the Masason Foundation',
   },
@@ -136,7 +136,7 @@ export const PROJECTS: Project[] = [
     summary:
       'A compressed-air launcher for T-shirts and tennis balls that aims itself. It started as Javelin 2, a three-person AP Physics 1 project where I was lead designer, planner and builder. I then rebuilt it with camera aiming: click a target, and it solves for launch angle and pressure and drives the barrel there.',
     tags:       ['Pneumatics', 'Controls', 'Computer Vision', '3D Printing'],
-    cover:      '/images/projects/j2-complete.jpg',
+    cover:      '/images/projects/j2-complete.webp',
     coverAlt:   'The completed J2 launcher standing on its rotating base outdoors, barrel raised against autumn woods',
     coverFocus: 'center 45%',
   },
@@ -166,7 +166,7 @@ export const PROJECTS: Project[] = [
     summary:
       'A 10-ft water rocket with a 2-liter bottle pressure chamber, printed nose cone, clear tube body sections and three fin sets. It launched cleanly, then pitched over and landed nose-first.',
     tags:       ['Rocketry', 'Aerodynamics', '3D Printing', 'Physics'],
-    cover:      '/images/projects/rocket10-launch.jpg',
+    cover:      '/images/projects/rocket10-launch.webp',
     coverAlt:   'The 10-ft water rocket standing on its launch pad on the school field with the class watching from a distance',
     coverFocus: 'center 40%',
   },
@@ -181,7 +181,7 @@ export const PROJECTS: Project[] = [
     summary:
       'Custom business cards that need CAD, CAM and six manufacturing processes each: an SLS-printed frame, CNC-machined brass lettering, laser-cut acrylic, anodizing, multi-color and resin printing, and an embedded NFC tag that opens this site.',
     tags:     ['CNC', 'SLS', 'Anodizing', 'NFC', 'Product Design'],
-    cover:    '/images/projects/bdcards-card.jpg',
+    cover:    '/images/projects/bdcards-card.webp',
     coverAlt: 'A finished BD card held in hand — machined frame, lattice infill, and raised BENJAMIN DAVIS / ADVANCED MANUFACTURING lettering',
   },
 
@@ -197,7 +197,7 @@ export const PROJECTS: Project[] = [
     summary:
       'Learning tiles for children with disabilities, donated to Pappas Rehabilitation Hospital. Each tile has a raised icon, large print and braille, so sighted and blind students can use the same card.',
     tags:     ['Accessibility', '3D Printing', 'Fusion 360', 'TechForge'],
-    cover:    '/images/projects/tactile-tiles.jpg',
+    cover:    '/images/projects/tactile-tiles.webp',
     coverAlt: 'Eight finished tactile learning tiles laid out on a dark bench — raised orange icons, large print and braille on white tiles',
   },
   {
@@ -211,7 +211,7 @@ export const PROJECTS: Project[] = [
     summary:
       'A holiday conveyor that carries 3D-printed toys under a decorated hopper for my school\'s annual Santa Shop. I led the TechForge team and set up an assembly line to make the rollers.',
     tags:     ['Mechanisms', 'Team Lead', 'Fabrication', 'TechForge'],
-    cover:    '/images/projects/santa-conveyor.jpg',
+    cover:    '/images/projects/santa-conveyor.webp',
     coverAlt: 'The finished Santa Shop conveyor installed in the school hall, clad in wrapping paper and decorated for the event',
   },
   {
