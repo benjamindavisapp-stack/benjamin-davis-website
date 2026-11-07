@@ -3,21 +3,11 @@ import Layout     from '@/layouts/Layout.astro';
 import Lattice    from '@/components/Lattice.astro';
 import Bolt       from '@/components/Bolt.astro';
 import SLAText    from '@/components/SLAText.astro';
+import { SECTIONS, projectsIn } from '@/data/projects';
 
-const research = [
-  {
-    title:   'From Crude to Extrude',
-    summary: 'A desktop system that recycles PET plastic waste and 3D-printing purge material into additive-manufacturing filament at commercial tolerance.',
-    year:    '2024–2025',
-    tags:    ['ISEF 2025', 'Additive Manufacturing', 'Recycling', 'Systems Engineering'],
-    href:    '/research/from-crude-to-extrude',
-    featured: true,
-    image:   '/images/machine-full.jpg',
-    imageAlt: 'The From Crude to Extrude recycling machine at ISEF 2025',
-    highlight: 'Regeneron Young Scientist Award · $75K Scholarship · 1 of 2 worldwide',
-  },
-];
-
+/* The arrays below feed the three sections currently hidden at the bottom of
+   this page (Projects & Builds, Mini-Projects, Early Builds). The ten live
+   projects come from src/data/projects.ts instead. */
 const miniProjects = [
   {
     title:    'Javelin 2 — "Tennis Ball" Cannon',
@@ -130,7 +120,7 @@ const builds = [
 
 <Layout
   title="Research & Projects — Benjamin Davis"
-  description="Advanced manufacturing research, fabrication projects, and builds by Benjamin Davis — including the ISEF 2025 Young Scientist Award-winning 'From Crude to Extrude' recycling system."
+  description="Ten engineering projects by Benjamin Davis — plastic-waste filament research, CNC machine conversions, a camera-aimed pneumatic launcher, water rockets, machined cards and community builds."
 >
 
   <!-- ── Hero ──────────────────────────────────────────────────────────────── -->
@@ -151,52 +141,121 @@ const builds = [
       <p class="hero-sub">
         Independent research &middot; Original fabrication &middot; Community builds
       </p>
+      <p class="hero-intro">
+        I design and build machines, then use them to make things for real
+        people. Most of my work is about accessible, sustainable manufacturing:
+        turning plastic waste into 3D-printing filament, and building the shop
+        tools that make that process better.
+      </p>
     </div>
   </section>
 
   <!-- ══════════════════════════════════════════════════════════════════════
-       SECTION 1 — RESEARCH
+       THE TEN PROJECTS — four sections, built from src/data/projects.ts
   ══════════════════════════════════════════════════════════════════════════ -->
-  <section class="index-section">
-    <div class="container">
-      <div class="section-header">
-        <p class="section-overline">01</p>
-        <SLAText id="research-sec-01" duration={1.8} layers={1} trigger="scroll" delay={0.05}>
-          <h2 class="section-title">Research</h2>
-        </SLAText>
-      </div>
+  {SECTIONS.map(sec => {
+    const items = projectsIn(sec.id);
+    /* A lone project in a grid leaves a dead cell beside it, so single-entry
+       sections borrow the wide featured layout instead. */
+    const wide = sec.featured || items.length === 1;
+    return (
+    <section class:list={['index-section', { 'index-section--dark': sec.dark }]}>
+      <div class="container">
+        <div class="section-header">
+          <p class="section-overline">{sec.num}</p>
+          <SLAText id={`research-sec-${sec.num}`} duration={1.8} layers={1} trigger="scroll" delay={0.05}>
+            <h2 class="section-title">{sec.title}</h2>
+          </SLAText>
+        </div>
 
-      {research.map(p => (
-        <article class="featured-card">
-          <div class="fc-image-wrap">
-            <img
-              src={p.image}
-              alt={p.imageAlt}
-              width="800"
-              height="540"
-              loading="lazy"
-              decoding="async"
-            />
-            <span class="fc-year" aria-hidden="true">{p.year}</span>
-          </div>
+        {sec.intro && <p class="section-intro">{sec.intro}</p>}
 
-          <div class="fc-content">
-            <div class="fc-tags" aria-label="Tags">
-              {p.tags.map(t => <span class="tag">{t}</span>)}
+        {wide
+          ? (
+            <div class="featured-stack">
+              {items.map(p => (
+                <article class="featured-card">
+                  <a class="fc-image-wrap" href={`/research/${p.slug}`} tabindex="-1" aria-hidden="true">
+                    <img
+                      src={p.cover}
+                      alt=""
+                      width="800"
+                      height="540"
+                      loading="lazy"
+                      decoding="async"
+                      style={p.coverFocus ? `object-position:${p.coverFocus}` : undefined}
+                    />
+                    <span class="fc-year">{p.year}</span>
+                  </a>
+
+                  <div class="fc-content">
+                    <div class="fc-tags" aria-label="Tags">
+                      {p.tags.map(t => <span class="tag">{t}</span>)}
+                    </div>
+                    <h3 class="fc-title">
+                      <a href={`/research/${p.slug}`}>{p.title}</a>
+                    </h3>
+                    <p class="fc-meta">
+                      <span>{p.role}</span>
+                      <span class="fc-dot" aria-hidden="true">·</span>
+                      <span class={`status status--${p.status === 'Complete' ? 'done' : 'live'}`}>{p.status}</span>
+                    </p>
+                    <p class="fc-summary">{p.summary}</p>
+                    {p.highlight && <p class="fc-highlight">{p.highlight}</p>}
+                    <span class="fc-link" aria-hidden="true">View full project &rarr;</span>
+                  </div>
+                </article>
+              ))}
             </div>
-            <h3 class="fc-title">{p.title}</h3>
-            <p class="fc-summary">{p.summary}</p>
-            {p.highlight && (
-              <p class="fc-highlight">{p.highlight}</p>
-            )}
-            <a href={p.href} class="fc-link">
-              View full project &rarr;
-            </a>
-          </div>
-        </article>
-      ))}
-    </div>
-  </section>
+          )
+          : (
+            <div class="proj-grid">
+              {items.map(p => (
+                <article class="proj-card">
+                  <a class="prc-media" href={`/research/${p.slug}`} tabindex="-1" aria-hidden="true">
+                    {p.cover
+                      ? (
+                        <img
+                          src={p.cover}
+                          alt=""
+                          width="600"
+                          height="400"
+                          loading="lazy"
+                          decoding="async"
+                          style={p.coverFocus ? `object-position:${p.coverFocus}` : undefined}
+                        />
+                      )
+                      : (
+                        <span class="prc-placeholder">Photo to come</span>
+                      )
+                    }
+                    <span class="prc-year">{p.year}</span>
+                  </a>
+
+                  <div class="prc-body">
+                    <h3 class="prc-title">
+                      <a href={`/research/${p.slug}`}>{p.title}</a>
+                    </h3>
+                    <p class="prc-meta">
+                      <span>{p.role}</span>
+                      <span class="fc-dot" aria-hidden="true">·</span>
+                      <span class={`status status--${p.status === 'Complete' ? 'done' : 'live'}`}>{p.status}</span>
+                    </p>
+                    <p class="prc-summary">{p.summary}</p>
+                    {p.highlight && <p class="prc-highlight">{p.highlight}</p>}
+                    <div class="prc-tags" aria-label="Tags">
+                      {p.tags.map(t => <span class="tag">{t}</span>)}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )
+        }
+      </div>
+    </section>
+    );
+  })}
 
   <!-- ══════════════════════════════════════════════════════════════════════
        SECTION 2 — PROJECTS & BUILDS
@@ -591,6 +650,195 @@ const builds = [
     .featured-card { grid-template-columns: 1fr; }
     .fc-image-wrap { aspect-ratio: 16 / 9; }
     .fc-content { border-left: none; border-top: 1px solid var(--panel-edge); padding: 1.5rem; }
+  }
+
+  /* ══ The ten projects ═════════════════════════════════════════════════════
+     Styles below drive the four live sections. The card markup wraps both the
+     cover and the title in links: the cover is aria-hidden so screen readers
+     get one link per card, not two.
+  ═══════════════════════════════════════════════════════════════════════════ */
+
+  .hero-intro {
+    font-size: 0.95rem;
+    line-height: 1.78;
+    color: var(--steel);
+    max-width: 580px;
+    margin-top: 0.6rem;
+  }
+
+  /* ── Status pill (shared by both card types) ─────────────────────────────── */
+  .status {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .status--done { color: var(--steel); }
+  .status--live { color: var(--copper); }
+
+  .fc-dot { color: var(--panel-edge); }
+
+  /* ── Featured (flagship research) ────────────────────────────────────────── */
+  .featured-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .fc-image-wrap {
+    display: block;
+    text-decoration: none;
+  }
+
+  .fc-title a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .featured-card:hover .fc-title a { color: var(--gold); }
+
+  .fc-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+  }
+
+  /* ── Project grid (sections 02–04) ───────────────────────────────────────── */
+  .proj-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    /* Real gaps and per-card borders, rather than a shared panel-edge
+       background showing through 1px gutters — a section with an odd number
+       of cards would otherwise leave a lit empty cell in the last row. */
+    gap: 1.25rem;
+  }
+
+  .proj-card {
+    background: var(--graphite);
+    border: 1px solid var(--panel-edge);
+    display: flex;
+    flex-direction: column;
+  }
+  .index-section--dark .proj-card { background: var(--panel); }
+
+  .prc-media {
+    position: relative;
+    display: block;
+    aspect-ratio: 3 / 2;
+    overflow: hidden;
+    background: var(--panel);
+    text-decoration: none;
+  }
+
+  .prc-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+    filter: brightness(0.82) contrast(1.08);
+    transition: filter 0.25s, transform 0.4s;
+  }
+
+  .proj-card:hover .prc-media img {
+    filter: brightness(0.95) contrast(1.05);
+    transform: scale(1.02);
+  }
+
+  .prc-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--panel-edge);
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.08em;
+    color: var(--steel);
+  }
+
+  .prc-year {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 0.28rem 0.55rem;
+    font-family: var(--font-mono);
+    font-size: 0.56rem;
+    letter-spacing: 0.1em;
+    color: var(--steel);
+    background: color-mix(in srgb, var(--graphite) 86%, transparent);
+    border-left: 1px solid var(--panel-edge);
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .prc-body {
+    padding: 1.35rem 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    flex: 1;
+  }
+
+  .prc-title {
+    font-family: var(--font-head);
+    font-size: 1.18rem;
+    font-weight: 700;
+    line-height: 1.12;
+    color: var(--text);
+  }
+
+  .prc-title a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .proj-card:hover .prc-title a { color: var(--gold); }
+
+  .prc-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+  }
+
+  .prc-summary {
+    font-size: 0.84rem;
+    line-height: 1.7;
+    color: var(--steel);
+    flex: 1;
+  }
+
+  .prc-highlight {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    line-height: 1.5;
+    letter-spacing: 0.06em;
+    color: var(--gold);
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--gold-dim);
+    background: color-mix(in srgb, var(--gold-dim) 20%, transparent);
+  }
+
+  .prc-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.15rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .proj-card:hover .prc-media img { transform: none; }
   }
 
   /* ── Project card grid ───────────────────────────────────────────────────── */

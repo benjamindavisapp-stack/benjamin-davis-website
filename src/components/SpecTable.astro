@@ -1,0 +1,111 @@
+---
+/**
+ * SpecTable — the spec-sheet table called for in CLAUDE.md: monospace labels,
+ * machined square corners, hairline borders. Used for build data, test
+ * results and award lists on project detail pages.
+ */
+
+export interface SpecRow {
+  key:   string;
+  value: string;
+  /** Optional third column — units, source, or a short note. */
+  note?: string;
+}
+
+interface Props {
+  rows:    SpecRow[];
+  caption?: string;
+  /** Column heading for the key column; defaults to no header row. */
+  head?:   [string, string] | [string, string, string];
+}
+
+const { rows, caption, head } = Astro.props;
+const hasNote = rows.some(r => r.note);
+---
+
+<table class="spec-table">
+  {caption && <caption>{caption}</caption>}
+  {head && (
+    <thead>
+      <tr>
+        {head.map(h => <th scope="col">{h}</th>)}
+      </tr>
+    </thead>
+  )}
+  <tbody>
+    {rows.map(r => (
+      <tr>
+        <th scope="row">{r.key}</th>
+        <td>{r.value}</td>
+        {hasNote && <td class="st-note">{r.note}</td>}
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+<style>
+  .spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid var(--panel-edge);
+    font-size: 0.85rem;
+  }
+
+  caption {
+    caption-side: top;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--copper);
+    padding-bottom: 0.6rem;
+  }
+
+  thead th {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--steel);
+    text-align: left;
+    padding: 0.6rem 0.85rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-edge);
+    font-weight: 500;
+  }
+
+  tbody th {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    color: var(--steel);
+    text-align: left;
+    font-weight: 400;
+    vertical-align: top;
+    width: 40%;
+  }
+
+  tbody th,
+  tbody td {
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--panel-edge);
+    line-height: 1.55;
+  }
+
+  tbody tr:last-child th,
+  tbody tr:last-child td { border-bottom: none; }
+
+  tbody td { color: var(--text); }
+
+  .st-note {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--steel);
+  }
+
+  @media (max-width: 560px) {
+    tbody th { width: 46%; }
+    .spec-table { font-size: 0.8rem; }
+  }
+</style>

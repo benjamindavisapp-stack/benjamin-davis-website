@@ -1,0 +1,127 @@
+---
+import ProjectLayout  from '@/layouts/ProjectLayout.astro';
+import ProjectSection from '@/components/ProjectSection.astro';
+import ProjectGallery from '@/components/ProjectGallery.astro';
+import SpecTable      from '@/components/SpecTable.astro';
+import { getProject, getNeighbours } from '@/data/projects';
+
+const p = getProject('gen-2-filament-research');
+---
+
+<ProjectLayout
+  title={p.title}
+  subtitle="Flagship Research · In progress"
+  role={p.role}
+  year={p.year}
+  tags={p.tags}
+  overview={p.summary}
+  ogImage={p.cover}
+  {...getNeighbours(p.slug)}
+>
+
+  <ProjectSection num="01" title="The three limits it fixes" dark>
+    <p>
+      The first machine worked, won, and then showed me exactly where it
+      stopped. Gen 2 is aimed at those three walls:
+    </p>
+    <SpecTable
+      caption="Gen 1 limit → Gen 2 answer"
+      head={['Limit', 'Gen 2 answer']}
+      rows={[
+        {
+          key: 'DIY-ground auger, about ±0.2 mm',
+          value: 'CNC-machined compression augers, including hollow augers',
+        },
+        {
+          key: '240 °C ceiling set by printed internal parts',
+          value: 'Higher-temperature machine able to run composites',
+        },
+        {
+          key: 'No way to make composite or core–shell filament',
+          value: 'Coaxial filament line — a core inside a separate sheath',
+        },
+      ]}
+    />
+    <p>
+      The auger work is why I am
+      <a href="/research/cnc-lathe-conversion">converting a lathe and building a hollow-bore 4th axis</a>:
+      buying precision augers at this size is not realistic, so the machines
+      that make them have to exist first.
+    </p>
+  </ProjectSection>
+
+  <ProjectSection num="02" title="Research threads">
+    <h3>Precision augers</h3>
+    <p>
+      CNC-machined compression augers replacing the hand-ground screw, with a
+      hollow-bore variant so long screws can be machined in sections.
+    </p>
+
+    <h3>Coaxial filament</h3>
+    <p>
+      A PLA-CF core wrapped in a plain PLA sheath, to test whether the sheath
+      cuts nozzle wear while the composite core keeps its strength. Carbon-fiber
+      filament chews through brass nozzles; if the abrasive material never
+      touches the nozzle wall, the trade may not be necessary.
+    </p>
+
+    <h3>Second-generation machine</h3>
+    <p>
+      Higher temperature and higher throughput, able to run composites such as
+      PLA-carbon fiber rather than stopping at 240 °C.
+    </p>
+
+    <h3>Environmental testing</h3>
+    <p>
+      Energy per unit of filament and particulate emissions, measured across
+      materials rather than for a single feedstock — the same measurement
+      discipline as the first machine, applied to a wider set.
+    </p>
+
+    <h3>Drive test</h3>
+    <p>
+      A high-torque gearmotor compared against a radial-piston hydraulic motor.
+      This is a proof of concept for a future oil-cooled machine that would
+      wrap a high-temperature shell such as PEEK around a lower-temperature
+      core.
+    </p>
+  </ProjectSection>
+
+  <ProjectSection num="03" title="Where it stands" dark>
+    <SpecTable
+      caption="Status, November 2026"
+      rows={[
+        { key: 'Literature and patent review', value: 'Done' },
+        { key: 'Design calculations',          value: 'Done', note: 'L/D ratio, flight pitch, compression ratio, channel depth, torque, power' },
+        { key: 'Lathe and mill',               value: 'Delivered to the shop' },
+        { key: 'Lathe CNC conversion',         value: 'In progress' },
+        { key: 'Hollow-bore 4th axis',         value: 'In progress' },
+      ]}
+    />
+
+    <ProjectGallery
+      cols={2}
+      images={[
+        {
+          src: '/images/projects/gen2-auger-bench.jpg',
+          alt: 'The first-generation hand-ground compression auger lying on the workbench next to the tooling used to make it',
+          caption: 'The Gen 1 auger: hand-ground, about ±0.2 mm, and the part Gen 2 replaces.',
+        },
+        {
+          src: '/images/projects/shop-auger-grinder.jpg',
+          alt: 'The router-based compression-screw grinder used to cut the first-generation auger, built on a wooden frame with an aluminum bed',
+          caption: 'The modified compression-screw grinder that cut it — scaled up from the open-source design.',
+        },
+      ]}
+    />
+  </ProjectSection>
+
+  <ProjectSection num="04" title="Support">
+    <p>
+      This work is supported by the <strong>Masason Foundation</strong>, which
+      funds the machine tools, materials and instrumentation across the
+      July 2026 – June 2027 research year.
+    </p>
+  </ProjectSection>
+
+</ProjectLayout>

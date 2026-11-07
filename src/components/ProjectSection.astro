@@ -1,0 +1,131 @@
+---
+/**
+ * ProjectSection — a titled band inside a project detail page.
+ *
+ * Carries the shared prose styling for slotted content so each of the ten
+ * detail pages can write plain <p>/<ul>/<ol> without repeating the CSS.
+ */
+
+interface Props {
+  title: string;
+  /** Monospace overline above the title, e.g. "02". */
+  num?:  string;
+  dark?: boolean;
+  id?:   string;
+}
+
+const { title, num, dark = false, id } = Astro.props;
+---
+
+<section class:list={['ps', { 'ps--dark': dark }]} id={id}>
+  <div class="container">
+    <div class="ps-head">
+      {num && <p class="ps-num">{num}</p>}
+      <h2 class="ps-title">{title}</h2>
+    </div>
+    <div class="ps-content">
+      <slot />
+    </div>
+  </div>
+</section>
+
+<style>
+  .ps {
+    padding-block: 3rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .ps--dark { background: var(--panel); }
+
+  .ps-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .ps-num {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    color: var(--copper);
+  }
+
+  .ps-title {
+    font-family: var(--font-head);
+    font-size: clamp(1.5rem, 4.5vw, 2.1rem);
+    font-weight: 900;
+    line-height: 1.05;
+    color: var(--text);
+  }
+
+  /* ── Slotted prose ──────────────────────────────────────────────────── */
+  .ps-content :global(p) {
+    max-width: 680px;
+    line-height: 1.78;
+    color: var(--text);
+  }
+  .ps-content :global(p + p) { margin-top: 1rem; }
+
+  .ps-content :global(ul),
+  .ps-content :global(ol) {
+    max-width: 680px;
+    margin-top: 1.1rem;
+    padding-left: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+
+  .ps-content :global(li) {
+    position: relative;
+    padding-left: 1.4rem;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  .ps-content :global(ul > li)::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.72em;
+    width: 7px;
+    height: 1px;
+    background: var(--copper);
+  }
+
+  /* Numbered lists only where there is a genuine ordered procedure. */
+  .ps-content :global(ol) { counter-reset: step; }
+  .ps-content :global(ol > li) {
+    counter-increment: step;
+    padding-left: 2.1rem;
+  }
+  .ps-content :global(ol > li)::before {
+    content: counter(step, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: 0.1em;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--copper);
+  }
+
+  .ps-content :global(strong) {
+    color: var(--gold);
+    font-weight: 600;
+  }
+
+  .ps-content :global(a) { text-decoration: underline; text-underline-offset: 2px; }
+
+  .ps-content :global(h3) {
+    font-family: var(--font-head);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--gold);
+    margin-top: 2rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .ps-content :global(* + .gallery),
+  .ps-content :global(* + .spec-table) { margin-top: 1.75rem; }
+</style>

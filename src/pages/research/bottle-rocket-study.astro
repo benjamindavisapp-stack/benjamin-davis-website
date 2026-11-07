@@ -1,0 +1,91 @@
+---
+import ProjectLayout  from '@/layouts/ProjectLayout.astro';
+import ProjectSection from '@/components/ProjectSection.astro';
+import ProjectGallery from '@/components/ProjectGallery.astro';
+import SpecTable      from '@/components/SpecTable.astro';
+import { getProject, getNeighbours } from '@/data/projects';
+
+const p = getProject('bottle-rocket-study');
+---
+
+<ProjectLayout
+  title={p.title}
+  subtitle="Builds"
+  role={p.role}
+  year={p.year}
+  tags={p.tags}
+  overview={p.summary}
+  ogImage={p.cover}
+  specs={[
+    { key: 'Launches',      value: '100+' },
+    { key: 'Step size',     value: '50 mL' },
+    { key: 'Range tested',  value: '0–1,000 mL' },
+  ]}
+  {...getNeighbours(p.slug)}
+>
+
+  <ProjectSection num="01" title="The question" dark>
+    <p>
+      A water rocket trades two things against each other. More water means
+      more reaction mass to throw downward — but it also means less room for
+      air, so there is less stored energy to throw it with, and more dead
+      weight to lift. Somewhere between an empty bottle and a full one there
+      is a best answer.
+    </p>
+    <p>
+      This was my first research project, and the question was simple enough
+      to answer properly: <strong>how much water gives a bottle rocket the
+      best flight?</strong>
+    </p>
+  </ProjectSection>
+
+  <ProjectSection num="02" title="Method">
+    <p>
+      I built a rail-mounted launcher so every flight started the same way —
+      the rail removes the tip-off that makes hand-held launches
+      unrepeatable — and then ran the fill volume across its whole range in
+      even steps, recording apogee for each launch.
+    </p>
+    <SpecTable
+      caption="Experimental design"
+      rows={[
+        { key: 'Independent variable', value: 'Water fill volume' },
+        { key: 'Step size',            value: '50 mL' },
+        { key: 'Range',                value: '0 mL to 1,000 mL' },
+        { key: 'Dependent variable',   value: 'Apogee' },
+        { key: 'Total launches',       value: 'More than 100' },
+        { key: 'Control',              value: 'Fixed rail-mounted launcher, consistent pressure' },
+      ]}
+    />
+
+    <ProjectGallery
+      cols={1}
+      ratio="4 / 3"
+      images={[
+        {
+          src: '/images/engineering-rocket.jpg',
+          alt: 'Benjamin Davis setting the pressure gauge on the rail-mounted bottle rocket launcher before a test flight',
+          caption: 'Setting pressure before a run. The rail keeps the launch direction identical from flight to flight.',
+        },
+      ]}
+    />
+  </ProjectSection>
+
+  <ProjectSection num="03" title="Recognition" dark>
+    <SpecTable
+      caption="Awards"
+      rows={[
+        { key: 'Massachusetts Region III Science Fair', value: '1st Place' },
+        { key: 'Sanofi', value: 'Special Care Grand Prize' },
+        { key: 'U.S. Air Force', value: 'Certificate of Achievement' },
+        { key: 'Bishop Feehan', value: 'Excellence in Visual Presentation' },
+      ]}
+    />
+    <p>
+      Running a hundred launches to answer one question is also what taught me
+      how the rest of my research works: pick a variable, hold everything else
+      still, and collect enough data that the answer is not an opinion.
+    </p>
+  </ProjectSection>
+
+</ProjectLayout>

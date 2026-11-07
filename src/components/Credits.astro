@@ -1,0 +1,128 @@
+---
+/**
+ * Credits — attribution block for project pages: who worked on it, which
+ * open-source designs or files were adapted, who advised, and where AI
+ * assistance was used.
+ *
+ * Only pages with real attributions carry this block. Collaborators without a
+ * `url` render as plain text, so a link can be added later without touching
+ * the layout.
+ */
+
+import type { Collaborator } from '@/data/projects';
+
+interface Props {
+  /** People who built it with Benjamin. */
+  team?:  Collaborator[];
+  /** Label for the team line, e.g. "Original physics team". */
+  teamLabel?: string;
+  /** Adapted sources, advisors, inspirations — one per line. */
+  items?: string[];
+  /** Disclosure of AI assistance, kept in the MIT portfolio wording. */
+  aiNote?: string;
+}
+
+const { team = [], teamLabel = 'Team', items = [], aiNote } = Astro.props;
+---
+
+<aside class="credits" aria-label="Credits and attribution">
+  <p class="cr-overline">Credits &amp; Attribution</p>
+
+  {team.length > 0 && (
+    <p class="cr-team">
+      <span class="cr-label">{teamLabel}</span>
+      <span class="cr-names">
+        {team.map((p, i) => (
+          <>
+            {i > 0 && <span class="cr-sep" aria-hidden="true">·</span>}
+            {p.url
+              ? <a href={p.url} target="_blank" rel="noopener noreferrer">{p.name}</a>
+              : <span>{p.name}</span>
+            }
+          </>
+        ))}
+      </span>
+    </p>
+  )}
+
+  {items.length > 0 && (
+    <ul class="cr-list">
+      {items.map(item => <li>{item}</li>)}
+    </ul>
+  )}
+
+  {aiNote && (
+    <p class="cr-ai">
+      <span class="cr-label">AI assistance</span>
+      <span>{aiNote}</span>
+    </p>
+  )}
+</aside>
+
+<style>
+  .credits {
+    border: 1px solid var(--panel-edge);
+    border-left: 2px solid var(--gold-dim);
+    padding: 1.1rem 1.25rem;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+
+  .cr-overline {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+
+  .cr-label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--steel);
+    margin-bottom: 0.25rem;
+  }
+
+  .cr-team,
+  .cr-ai {
+    font-size: 0.82rem;
+    line-height: 1.65;
+    color: var(--text);
+  }
+
+  .cr-names { display: inline; }
+  .cr-sep {
+    color: var(--panel-edge);
+    margin-inline: 0.4rem;
+  }
+
+  .cr-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .cr-list li {
+    position: relative;
+    padding-left: 1.1rem;
+    font-size: 0.8rem;
+    line-height: 1.65;
+    color: var(--steel);
+  }
+
+  .cr-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.72em;
+    width: 6px;
+    height: 1px;
+    background: var(--gold-dim);
+  }
+</style>

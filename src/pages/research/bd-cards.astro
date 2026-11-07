@@ -1,0 +1,129 @@
+---
+import ProjectLayout  from '@/layouts/ProjectLayout.astro';
+import ProjectSection from '@/components/ProjectSection.astro';
+import ProjectGallery from '@/components/ProjectGallery.astro';
+import SpecTable      from '@/components/SpecTable.astro';
+import { getProject, getNeighbours } from '@/data/projects';
+
+const p = getProject('bd-cards');
+---
+
+<ProjectLayout
+  title={p.title}
+  subtitle="Builds"
+  role={p.role}
+  year={p.year}
+  tags={p.tags}
+  overview={p.summary}
+  ogImage={p.cover}
+  specs={[
+    { key: 'Processes per card', value: '6' },
+    { key: 'Tap target',         value: 'This site' },
+  ]}
+  {...getNeighbours(p.slug)}
+>
+
+  <ProjectSection num="01" title="A business card as a manufacturing exercise" dark>
+    <p>
+      A paper business card gets thrown away. One that takes six manufacturing
+      processes to make does not — and making it is the point. Every card is a
+      complete CAD-to-CAM-to-part exercise at a scale small enough to iterate
+      on in an evening.
+    </p>
+    <p>
+      If you arrived here by tapping a card against your phone, the NFC tag
+      inside it is what sent you.
+    </p>
+
+    <ProjectGallery
+      cols={2}
+      images={[
+        {
+          src: '/images/projects/bdcards-card.jpg',
+          alt: 'A finished BD card held in hand, showing the machined frame, lattice infill and raised BENJAMIN DAVIS / ADVANCED MANUFACTURING lettering',
+          caption: 'The card: machined frame, structural lattice, raised nameplate.',
+        },
+        {
+          src: '/images/card-back.webp',
+          alt: 'Render of the card reverse, showing the copper QR inlay set into the lattice frame',
+          caption: 'The reverse, with the QR inlay.',
+        },
+      ]}
+    />
+  </ProjectSection>
+
+  <ProjectSection num="02" title="The six processes">
+    <SpecTable
+      caption="One card, six processes"
+      head={['Process', 'What it makes']}
+      rows={[
+        { key: 'SLS printing',        value: 'The card frame' },
+        { key: 'CNC machining',       value: 'Brass lettering' },
+        { key: 'Laser cutting',       value: 'Acrylic layer' },
+        { key: 'Anodizing',           value: 'Surface finish and color' },
+        { key: 'Multi-color FDM',    value: 'Two-tone printed detail' },
+        { key: 'Resin printing',      value: 'Fine-feature parts' },
+      ]}
+    />
+    <p>
+      The NFC tag is not a seventh process — it is a component the six have to
+      make room for.
+    </p>
+    <p>
+      Each process constrains the next. The SLS frame sets the pockets the
+      brass has to land in; the anodizing has to happen before anything heat-
+      sensitive goes in; the NFC tag has to be buried deep enough to survive
+      handling and shallow enough to read through the face.
+    </p>
+  </ProjectSection>
+
+  <ProjectSection num="03" title="Variants" dark>
+    <h3>The milled copper circuit-board card</h3>
+    <p>
+      A card milled as an actual PCB — copper traces routed into clad board,
+      the name and QR laid out as part of the circuit artwork rather than
+      printed on top of it.
+    </p>
+
+    <h3>Nameplates</h3>
+    <p>
+      The same process set, scaled up: brass and aluminum nameplates with
+      two-color printed inserts, made for school staff. Each one carries the
+      person's name, role and a QR or contact detail in the insert.
+    </p>
+
+    <ProjectGallery
+      cols={3}
+      images={[
+        {
+          src: '/images/projects/bdcards-pcb.jpg',
+          alt: 'The milled copper circuit-board card, with routed copper traces forming the name and layout on green clad board',
+          caption: 'Milled copper PCB card.',
+        },
+        {
+          src: '/images/projects/bdcards-nameplate-liam.jpg',
+          alt: 'A copper-framed nameplate reading Liam Sheehan, Math Economics History, held in hand',
+          caption: 'Nameplate with a two-color printed insert.',
+        },
+        {
+          src: '/images/projects/bdcards-nameplate-staff.jpg',
+          alt: 'A gold-framed staff nameplate reading Mrs. Smith, VP of Student Life, with printed social and email icons',
+          caption: 'Staff nameplate, with contact icons in the insert.',
+        },
+      ]}
+    />
+  </ProjectSection>
+
+  <ProjectSection num="04" title="Want one?">
+    <p>
+      I design and produce bespoke cards and nameplates — same materials, same
+      tolerances, same process. Lead time and pricing depend on quantity and
+      complexity. <a href="/contact">Get in touch</a> if you want one made.
+    </p>
+    <p>
+      More on how the physical card drove the design of this site is on the
+      <a href="/website">website page</a>.
+    </p>
+  </ProjectSection>
+
+</ProjectLayout>
