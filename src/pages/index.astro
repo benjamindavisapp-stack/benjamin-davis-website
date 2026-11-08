@@ -3,6 +3,7 @@ import Layout   from '@/layouts/Layout.astro';
 import Lattice  from '@/components/Lattice.astro';
 import Bolt     from '@/components/Bolt.astro';
 import CncMill  from '@/components/CncMill.astro';
+import VideoFigure from '@/components/VideoFigure.astro';
 ---
 
 <Layout title="Benjamin Davis — Advanced Manufacturing">
@@ -129,6 +130,24 @@ import CncMill  from '@/components/CncMill.astro';
         <a href="/research" class="fw-link">Read the full project &rarr;</a>
       </div>
 
+    </div>
+  </section>
+
+  <!-- ── In motion ─────────────────────────────────────────────────────────── -->
+  <section class="reel">
+    <div class="container reel-body">
+      <p class="reel-overline">In Motion</p>
+      <h2 class="reel-title">J2 &mdash; a launcher that aims itself</h2>
+      <p class="reel-sub">
+        Fifteen seconds of the camera-aimed pneumatic launcher: built, wired,
+        and driving itself to a firing solution.
+      </p>
+      <VideoFigure
+        src="/video/j2-launcher-15s.mp4"
+        poster="/images/projects/j2-video-poster.webp"
+        label="Fifteen-second film of the J2 pneumatic launcher being built and aiming itself at a target."
+      />
+      <a href="/research/j2-launcher" class="reel-link">See how it was built &rarr;</a>
     </div>
   </section>
 
@@ -420,6 +439,50 @@ import CncMill  from '@/components/CncMill.astro';
   }
 
   /* Positioning statement */
+  /* ── In-motion reel ──────────────────────────────────────────────────────── */
+  .reel {
+    padding-block: 3.5rem;
+    border-bottom: 1px solid var(--panel-edge);
+    background: var(--panel);
+  }
+  .reel-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    max-width: 760px;
+  }
+  .reel-overline {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+  .reel-title {
+    font-family: var(--font-head);
+    font-size: clamp(1.4rem, 4.5vw, 2rem);
+    font-weight: 900;
+    color: var(--text);
+    line-height: 1.1;
+  }
+  .reel-sub {
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--steel);
+    margin-bottom: 0.5rem;
+  }
+  .reel-link {
+    align-self: flex-start;
+    margin-top: 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .reel-link:hover { color: var(--gold-bright); }
+
   .hero-statement {
     font-size: clamp(0.95rem, 3vw, 1.1rem);
     line-height: 1.6;

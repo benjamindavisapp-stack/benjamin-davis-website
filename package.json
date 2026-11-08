@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "build:resume": "astro build && node scripts/build-resume-pdf.mjs && astro build"
   },
   "dependencies": {
     "astro": "^4.16.0"

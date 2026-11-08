@@ -4,6 +4,7 @@ import ProjectSection from '@/components/ProjectSection.astro';
 import ProjectGallery from '@/components/ProjectGallery.astro';
 import SpecTable      from '@/components/SpecTable.astro';
 import Credits        from '@/components/Credits.astro';
+import VideoFigure    from '@/components/VideoFigure.astro';
 import { getProject, getNeighbours } from '@/data/projects';
 
 const p = getProject('j2-launcher');
@@ -33,6 +34,13 @@ const p = getProject('j2-launcher');
       a projectile there, then drives the barrel to that solution on two
       stepper-driven axes.
     </p>
+
+    <VideoFigure
+      src="/video/j2-launcher-30s.mp4"
+      poster="/images/projects/j2-video-poster.webp"
+      label="Thirty-second build film of the J2 launcher: the frame going together, the aiming software locking onto a target, and the launcher driving itself to the firing solution."
+      caption="Thirty seconds of the build, from bare frame to the launcher aiming itself."
+    />
 
     <ProjectGallery
       cols={2}

@@ -215,6 +215,21 @@ export const PROJECTS: Project[] = [
     coverAlt: 'The finished Santa Shop conveyor installed in the school hall, clad in wrapping paper and decorated for the event',
   },
   {
+    slug:       'robotics-techforge',
+    section:    'community',
+    title:      'TechForge and the Robotics Team',
+    shortTitle: 'TechForge & Robotics',
+    year:       '2023–present',
+    role:       'Co-founder · Robotics captain',
+    status:     'Ongoing',
+    summary:
+      'I co-founded TechForge, my school\'s hands-on design and fabrication club, and captain the robotics team. Between them I have taught 20+ students CAD, 3D printing, CNC machining and hand tools, grew the robotics team by 25% in a year, and secured close to $5,000 for a new printer in the school\'s fabrication lab.',
+    tags:     ['Leadership', 'Teaching', 'Fundraising', 'FIRST / FTC'],
+    cover:    '/images/projects/santa-team.webp',
+    coverAlt: 'The TechForge team gathered around the conveyor they built, watching it run in the school fabrication lab',
+    highlight: '20+ students taught · Team grown 25% · ~$5,000 raised',
+  },
+  {
     slug:       'harvard-street',
     section:    'community',
     title:      'Harvard Street Project',

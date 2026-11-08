@@ -1,0 +1,127 @@
+---
+import ProjectLayout  from '@/layouts/ProjectLayout.astro';
+import ProjectSection from '@/components/ProjectSection.astro';
+import ProjectGallery from '@/components/ProjectGallery.astro';
+import SpecTable      from '@/components/SpecTable.astro';
+import { getProject, getNeighbours } from '@/data/projects';
+
+const p = getProject('robotics-techforge');
+---
+
+<ProjectLayout
+  title={p.title}
+  subtitle="Team & Community"
+  role={p.role}
+  year={p.year}
+  tags={p.tags}
+  overview={p.summary}
+  ogImage={p.cover}
+  specs={[
+    { key: 'Students taught', value: '20+'     },
+    { key: 'Team growth',     value: '25%'     },
+    { key: 'Raised',          value: '~$5,000' },
+    { key: 'Summer camps',    value: '2 years' },
+  ]}
+  {...getNeighbours(p.slug)}
+>
+
+  <ProjectSection num="01" title="TechForge" dark>
+    <p>
+      I co-founded <strong>TechForge</strong>, Bishop Feehan's hands-on design
+      and fabrication club, open to every student in grades 9–12. It exists
+      because the gap between wanting to build something and being allowed near
+      the machines that build it is mostly a gap in teaching.
+    </p>
+    <p>
+      The club works in 3D printing, CNC machining and drone technology. I have
+      personally taught more than twenty students to use printers, CNC
+      machines, hand tools and CAD — not demonstrations, but enough that they
+      can start a part of their own and finish it.
+    </p>
+
+    <h3>What the club has built</h3>
+    <ul>
+      <li>
+        <a href="/research/tactile-learning-tiles">Tactile learning tiles</a> for
+        children with disabilities, donated to Pappas Rehabilitation Hospital
+      </li>
+      <li>
+        A working <a href="/research/santa-shop-conveyor">conveyor</a> carrying
+        3D-printed toys for the school's annual Santa Shop
+      </li>
+    </ul>
+
+    <ProjectGallery
+      cols={2}
+      images={[
+        {
+          src: '/images/projects/santa-team.webp',
+          alt: 'The TechForge team gathered around the conveyor in the school fabrication lab, watching it run',
+          caption: 'The team watching the conveyor run for the first time at full length.',
+        },
+        {
+          src: '/images/projects/tactile-tiles.webp',
+          alt: 'Finished tactile learning tiles with raised icons, large print and braille',
+          caption: 'Tactile tiles, designed and printed by the club and donated to Pappas Rehabilitation Hospital.',
+        },
+      ]}
+    />
+  </ProjectSection>
+
+  <ProjectSection num="02" title="Robotics, as captain">
+    <p>
+      Captaining the robotics team turned out to be less about robots than
+      about the conditions a team needs before it can build one: knowing what
+      parts you own, having a budget, and having enough people.
+    </p>
+
+    <SpecTable
+      caption="What changed"
+      rows={[
+        { key: 'Membership',   value: 'Grew the team by 25% in a single year' },
+        { key: 'Organization', value: 'Instituted a cataloguing and repair system for team components' },
+        { key: 'Budget',       value: 'Took on planning and ordering; secured a $1,000 increase from my ISEF winnings' },
+        { key: 'Fundraising',  value: 'Built the case that raised close to $5,000 for a Bambu Lab H2C in the school fabrication lab' },
+        { key: 'Teaching',     value: 'Building, 3D printing, CNC, CAD, tool use and design, to 20+ students' },
+        { key: 'Outreach',     value: 'Two years volunteering at the robotics summer camp, teaching FIRST and FTC to elementary and middle schoolers' },
+      ]}
+    />
+
+    <p>
+      The printer is the part I am most pleased with. I put together the
+      presentation that justified it, and it now sits in the school's
+      fabrication lab where any student can use it — which is considerably
+      more useful than one more thing in my own workshop.
+    </p>
+
+    <ProjectGallery
+      cols={1}
+      ratio="16 / 9"
+      images={[
+        {
+          alt: 'The robotics team at work in the fabrication lab',
+          pending: 'Photo to come — robotics team',
+        },
+      ]}
+    />
+  </ProjectSection>
+
+  <ProjectSection num="03" title="Mentoring beyond school" dark>
+    <p>
+      I mentor science fair students for free, at Bishop Feehan and online
+      through LinkedIn, Discord and Zoom. Most of what I pass on is not
+      technical: it is how to choose a question you can actually answer, how to
+      keep records good enough to defend, and what judges are listening for.
+    </p>
+    <p>
+      I also sit on the <strong>Massachusetts Science &amp; Engineering Fair
+      Advisory Board</strong>, helping plan the fairs and the interaction
+      between current students and alumni.
+    </p>
+    <p>
+      If you are a student working on a project and want a second opinion on
+      it, <a href="/contact">get in touch</a> — this part is free and I mean it.
+    </p>
+  </ProjectSection>
+
+</ProjectLayout>

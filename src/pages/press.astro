@@ -1,0 +1,430 @@
+---
+import Layout  from '@/layouts/Layout.astro';
+import Lattice from '@/components/Lattice.astro';
+import Bolt    from '@/components/Bolt.astro';
+import SLAText from '@/components/SLAText.astro';
+
+/**
+ * Press coverage. Every entry links out to the original — nothing here is
+ * summarised in a way that can't be checked at the source.
+ */
+const coverage = [
+  {
+    outlet:  'Society for Science',
+    kind:    'Interview',
+    date:    'June 2025',
+    title:   'Five Questions with Benjamin Davis, winner of the $75,000 Regeneron Young Scientist Award at Regeneron ISEF 2025',
+    url:     'https://www.societyforscience.org/blog/five-questions-benjamin-davis-winner-of-the-75000-regeneron-young-scientist-award-isef-2025/',
+    note:    'A long-form interview published by the organisation that runs ISEF, covering the machine, the workshop rebuild that followed, and what comes next.',
+    pull:    'Every student who has the opportunity to pursue research should try it.',
+    featured: true,
+  },
+  {
+    outlet: 'Society for Science',
+    kind:   'Press release',
+    date:   'May 2025',
+    title:  'Teen Scientists Win More Than $9 Million at the 75th Regeneron International Science and Engineering Fair',
+    url:    'https://www.societyforscience.org/press-release/regeneron-isef-2025-full-awards/',
+    note:   'The official awards release listing the Regeneron Young Scientist Award and the first place in Engineering Technology: Statics & Dynamics.',
+  },
+  {
+    outlet: 'ecoticias',
+    kind:   'Feature',
+    date:   '2025',
+    title:  'A 16-year-old from Massachusetts built a desktop machine that turns failed 3D prints and old plastic bottles into new filament',
+    url:    'https://www.ecoticias.com/en/a-16-year-old-from-massachusetts-built-a-desktop-machine-that-turns-failed-3d-prints-and-old-plastic-bottles-into-new-filament-for-90-less-than-commercial-recyclers-and-it-won-him-a-75-000-award/37448/',
+    note:   'International coverage focused on the cost and waste side of the machine.',
+  },
+  {
+    outlet: 'News for Kids',
+    kind:   'Article',
+    date:   'June 2025',
+    title:  'Students Shine at International Science Fair',
+    url:    'https://newsforkids.net/articles/2025/06/12/students-shine-at-international-science-fair/',
+    note:   'A write-up of ISEF 2025 for younger readers.',
+  },
+];
+
+const quotes = [
+  {
+    text: 'His innovative approach showed technical rigor and extraordinary resilience in problem-solving. His clear communication of his sophisticated project helped him stand out.',
+    attr: 'Jerome Smith',
+    role: 'Head of Community Affairs, Amazon New England Region',
+    src:  'Norfolk & Wrentham News, June 2025',
+  },
+  {
+    text: 'He learned, adapted, and persevered through adversity. And he has an extraordinary ability to explain complex ideas clearly, which is rare at any age.',
+    attr: 'Kelly Gomez',
+    role: 'Science Fair Mentor and Teacher, Bishop Feehan High School',
+  },
+  {
+    text: "Benjamin's win is a powerful reminder that extraordinary innovation is possible at any age. His work exemplifies what independent research should do: identify real-world problems, build practical solutions, and push the limits of creativity and determination.",
+    attr: 'Helen Rosenfeld',
+    role: 'Executive Director, Massachusetts Science & Engineering Fair',
+  },
+];
+
+const featured = coverage.find(c => c.featured)!;
+const rest     = coverage.filter(c => !c.featured);
+---
+
+<Layout
+  title="Press — Benjamin Davis"
+  description="Press coverage of Benjamin Davis and the From Crude to Extrude recycling system — including the Society for Science interview following the $75,000 Regeneron Young Scientist Award at ISEF 2025."
+>
+
+  <section class="hero">
+    <Lattice />
+    <Bolt position="tl" />
+    <Bolt position="tr" />
+    <Bolt position="bl" />
+    <Bolt position="br" />
+    <div class="container hero-body">
+      <p class="hero-eyebrow">Press</p>
+      <SLAText id="press-hero" duration={3} layers={2} delay={0.4}>
+        <h1 class="hero-heading">
+          What others<br/><span class="gold">have written.</span>
+        </h1>
+      </SLAText>
+      <p class="hero-sub">Coverage &middot; Interviews &middot; Quotes</p>
+      <p class="hero-intro">
+        Every item below links to the original. Where a number in someone
+        else's write-up differs from the one on this site, the figure here is
+        the one my own data supports.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Featured interview ─────────────────────────────────────────────────── -->
+  <section class="press-section">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">01</p>
+        <h2 class="section-title">The interview</h2>
+      </div>
+
+      <article class="feature">
+        <blockquote class="feature-pull">
+          <p>&ldquo;{featured.pull}&rdquo;</p>
+        </blockquote>
+        <div class="feature-body">
+          <p class="feature-meta">
+            <span class="fm-outlet">{featured.outlet}</span>
+            <span class="fm-dot" aria-hidden="true">&middot;</span>
+            <span>{featured.kind}</span>
+            <span class="fm-dot" aria-hidden="true">&middot;</span>
+            <span>{featured.date}</span>
+          </p>
+          <h3 class="feature-title">{featured.title}</h3>
+          <p class="feature-note">{featured.note}</p>
+          <a href={featured.url} class="feature-link" target="_blank" rel="noopener noreferrer">
+            Read it at Society for Science &nearr;
+          </a>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ── Further coverage ───────────────────────────────────────────────────── -->
+  <section class="press-section press-section--dark">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">02</p>
+        <h2 class="section-title">Coverage</h2>
+      </div>
+
+      <ul class="coverage-list">
+        {rest.map(c => (
+          <li class="cov-item">
+            <p class="cov-meta">
+              <span class="fm-outlet">{c.outlet}</span>
+              <span class="fm-dot" aria-hidden="true">&middot;</span>
+              <span>{c.kind}</span>
+              <span class="fm-dot" aria-hidden="true">&middot;</span>
+              <span>{c.date}</span>
+            </p>
+            <h3 class="cov-title">
+              <a href={c.url} target="_blank" rel="noopener noreferrer">{c.title}</a>
+            </h3>
+            <p class="cov-note">{c.note}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <!-- ── Quotes ─────────────────────────────────────────────────────────────── -->
+  <section class="press-section">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">03</p>
+        <h2 class="section-title">What people have said</h2>
+      </div>
+
+      <div class="quote-grid">
+        {quotes.map(q => (
+          <figure class="quote-card">
+            <blockquote><p>&ldquo;{q.text}&rdquo;</p></blockquote>
+            <figcaption>
+              <span class="q-attr">{q.attr}</span>
+              <span class="q-role">{q.role}</span>
+              {q.src && <span class="q-src">{q.src}</span>}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── For press ──────────────────────────────────────────────────────────── -->
+  <section class="press-section press-section--dark">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">04</p>
+        <h2 class="section-title">For journalists</h2>
+      </div>
+      <p class="section-intro">
+        For interviews, photographs of the machine, or technical detail beyond
+        what is on this site, the fastest route is email. A one-page summary of
+        my background is on the <a href="/resume">resume page</a>, and the full
+        technical write-up is on the
+        <a href="/research/from-crude-to-extrude">From Crude to Extrude</a> page.
+      </p>
+      <a href="/contact" class="feature-link">Get in touch &rarr;</a>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  .hero {
+    position: relative;
+    padding-block: 5rem 4rem;
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .hero-body {
+    position: relative;
+    z-index: 1;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+  .hero-heading {
+    font-family: var(--font-head);
+    font-size: clamp(2rem, 7vw, 3.5rem);
+    font-weight: 900;
+    line-height: 1.05;
+    color: var(--text);
+  }
+  .hero-sub {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--steel);
+  }
+  .hero-intro {
+    font-size: 0.92rem;
+    line-height: 1.75;
+    color: var(--steel);
+    max-width: 560px;
+  }
+
+  .press-section {
+    padding-block: 4rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .press-section--dark { background: var(--panel); }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .section-overline {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    color: var(--copper);
+  }
+  .section-title {
+    font-family: var(--font-head);
+    font-size: clamp(1.5rem, 5vw, 2.2rem);
+    font-weight: 900;
+    color: var(--text);
+  }
+  .section-intro {
+    font-size: 0.92rem;
+    line-height: 1.75;
+    color: var(--steel);
+    max-width: 620px;
+    margin-bottom: 1.25rem;
+  }
+
+  /* ── Featured interview ───────────────────────────────────────────────────── */
+  .feature {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1px solid var(--panel-edge);
+    background: var(--panel);
+  }
+  .feature-pull {
+    padding: 2.25rem 2rem;
+    display: flex;
+    align-items: center;
+    border-right: 1px solid var(--panel-edge);
+    background: color-mix(in srgb, var(--gold-dim) 12%, transparent);
+  }
+  .feature-pull p {
+    font-family: var(--font-head);
+    font-size: clamp(1.2rem, 3.2vw, 1.75rem);
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--gold);
+  }
+  .feature-body {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+  .feature-meta,
+  .cov-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+  }
+  .fm-outlet { color: var(--copper); }
+  .fm-dot    { color: var(--panel-edge); }
+
+  .feature-title {
+    font-family: var(--font-head);
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--text);
+  }
+  .feature-note {
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: var(--steel);
+    flex: 1;
+  }
+  .feature-link {
+    align-self: flex-start;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .feature-link:hover { color: var(--gold-bright); }
+
+  /* ── Coverage list ────────────────────────────────────────────────────────── */
+  .coverage-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--panel-edge);
+    border: 1px solid var(--panel-edge);
+  }
+  .cov-item {
+    background: var(--panel);
+    padding: 1.3rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+  .cov-title {
+    font-family: var(--font-head);
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .cov-title a {
+    color: var(--text);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .cov-title a:hover { color: var(--gold); }
+  .cov-note {
+    font-size: 0.82rem;
+    line-height: 1.65;
+    color: var(--steel);
+  }
+
+  /* ── Quotes ───────────────────────────────────────────────────────────────── */
+  .quote-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+  }
+  .quote-card {
+    border: 1px solid var(--panel-edge);
+    border-left: 2px solid var(--gold-dim);
+    background: var(--panel);
+    padding: 1.4rem 1.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .quote-card blockquote p {
+    font-size: 0.88rem;
+    line-height: 1.72;
+    color: var(--text);
+  }
+  .quote-card figcaption {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin-top: auto;
+  }
+  .q-attr {
+    font-family: var(--font-head);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--gold);
+  }
+  .q-role,
+  .q-src {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.06em;
+    line-height: 1.5;
+    color: var(--steel);
+  }
+  .q-src { color: var(--panel-edge); }
+
+  .gold { color: var(--gold); }
+
+  @media (max-width: 680px) {
+    .feature { grid-template-columns: 1fr; }
+    .feature-pull {
+      border-right: none;
+      border-bottom: 1px solid var(--panel-edge);
+      padding: 1.5rem 1.35rem;
+    }
+    .feature-body { padding: 1.35rem; }
+  }
+</style>
