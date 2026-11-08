@@ -3,7 +3,7 @@ import Layout  from '@/layouts/Layout.astro';
 import Lattice from '@/components/Lattice.astro';
 import Bolt    from '@/components/Bolt.astro';
 import FDMText from '@/components/FDMText.astro';
-import { SECTIONS, SOFTWARE } from '@/data/equipment';
+import { SECTIONS, SOFTWARE, SAFETY } from '@/data/equipment';
 
 const STATUS_LABEL = {
   owned:    null,
@@ -140,12 +140,41 @@ const STATUS_LABEL = {
     );
   })}
 
-  <!-- ── Software ───────────────────────────────────────────────────────────── -->
-  <section class="equip-section equip-section--dark">
+  <!-- ── Safety & shop practice ─────────────────────────────────────────────── -->
+  <section class="equip-section">
     <div class="container">
       <div class="section-header">
         <p class="section-overline">06</p>
         <FDMText id="equip-sec-06" duration={2.0} trigger="scroll" delay={0.05}>
+          <h2 class="section-title">Safety &amp; Shop Practice</h2>
+        </FDMText>
+      </div>
+
+      <p class="section-intro">
+        A lathe does not care how old you are. Before either machine conversion
+        runs under program control, it is covered by a written risk assessment
+        and approval package — <a href="/research/cnc-lathe-conversion">ISO 12100,
+        ANSI B11, NFPA 79 and OSHA lockout/tagout</a>, with a witnessed
+        commissioning plan. The rest is the equipment that gets worn.
+      </p>
+
+      <ul class="software-list">
+        {SAFETY.map(s => (
+          <li class="software-item">
+            <span class="sw-name">{s.name}</span>
+            <span class="sw-role">{s.role}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <!-- ── Software ───────────────────────────────────────────────────────────── -->
+  <section class="equip-section equip-section--dark">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">07</p>
+        <FDMText id="equip-sec-07" duration={2.0} trigger="scroll" delay={0.05}>
           <h2 class="section-title">Software &amp; Design Tools</h2>
         </FDMText>
       </div>

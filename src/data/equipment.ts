@@ -391,3 +391,20 @@ export const SOFTWARE: Software[] = [
   { name: 'Arduino IDE',  role: 'Firmware for the embedded control systems' },
   { name: 'Vernier Video Analysis', role: 'Frame-by-frame motion measurement — muzzle velocity, range and flight tracking' },
 ];
+
+export interface SafetyItem {
+  name: string;
+  role: string;
+}
+
+/**
+ * PPE and shop practice. Not machines, so this renders as its own list rather
+ * than as cards — and it sits before the software section on the page.
+ */
+export const SAFETY: SafetyItem[] = [
+  { name: 'Safety Glasses',  role: 'Worn for every cutting, grinding and machining operation, without exception' },
+  { name: 'Ear Protection',  role: 'Grinders, the chop saw and the bandsaw all sit well past the level where hearing damage accumulates' },
+  { name: 'Respirators',     role: 'Grinding, sanding and resin handling — the particulates I measure in the research are the same ones I breathe in the shop' },
+  { name: 'Gloves',          role: 'Chemical and handling protection, selected per task — and never worn near a rotating spindle' },
+  { name: 'Checklists',      role: 'Written start-up and shutdown checks, so a step gets skipped because it was done, not because it was forgotten' },
+];
