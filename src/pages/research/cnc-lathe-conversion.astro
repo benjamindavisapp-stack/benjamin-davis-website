@@ -60,19 +60,19 @@ const p = getProject('cnc-lathe-conversion');
   <ProjectSection num="03" title="Safety and commissioning" dark>
     <p>
       Converting a manual machine to computer control removes the operator from
-      the loop that used to make it safe. Before either machine cuts under
-      program control, I wrote a full risk assessment and approval package
-      against:
+      the loop that used to make it safe. On a manual lathe your hand is on the
+      handwheel; under program control the machine will drive a tool into
+      whatever the code tells it to, including the chuck, the carriage, or you.
     </p>
-    <ul>
-      <li><strong>ISO 12100</strong> — risk assessment and risk reduction</li>
-      <li><strong>ANSI B11</strong> — machine tool safety requirements</li>
-      <li><strong>NFPA 79</strong> — electrical standard for industrial machinery</li>
-      <li><strong>OSHA lockout/tagout</strong> — energy isolation during service</li>
-    </ul>
     <p>
-      The package includes a witnessed commissioning plan, so first powered
-      motion happens with a second person present and a defined abort.
+      So the conversion is being planned on paper before anything moves: the
+      ways each axis can fail, what happens when power is cut mid-cut, how the
+      machine is isolated for service, and where the stop is from every
+      position I might be standing in.
+    </p>
+    <p>
+      First powered motion happens with a second person present and an agreed
+      way to abort — not alone, and not at the end of a long evening.
     </p>
   </ProjectSection>
 
