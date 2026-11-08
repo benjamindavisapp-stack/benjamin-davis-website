@@ -1,0 +1,106 @@
+---
+/* Temporary holding page. While this is deployed, every route on the site
+   serves this and nothing else — the real pages live in src/_pages_offline
+   and the content assets in offline-assets/. The site is the landing page
+   for the metal card, so this keeps the name and the contact address and
+   drops everything else. Restore with: git revert <this commit>. */
+import '@/styles/global.css';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'Benjamin Davis' } = Astro.props;
+const email = 'BenjaminDavis.build@gmail.com';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0c0e" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="description" content="Benjamin Davis — site under construction." />
+
+    <meta property="og:type"        content="website" />
+    <meta property="og:title"       content="Benjamin Davis" />
+    <meta property="og:description" content="Site under construction." />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@700;900&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    />
+
+    <title>{title}</title>
+  </head>
+  <body>
+    <main class="holding">
+      <div class="plate">
+        <h1>Benjamin Davis</h1>
+        <div class="rule" aria-hidden="true"></div>
+        <p class="notice">Site under construction. Back shortly.</p>
+        <a class="email mono" href={`mailto:${email}`}>{email}</a>
+      </div>
+    </main>
+  </body>
+</html>
+
+<style>
+  .holding {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    padding: 2rem 1.25rem;
+    min-height: 100dvh;
+  }
+
+  .plate {
+    width: 100%;
+    max-width: 30rem;
+    text-align: center;
+  }
+
+  h1 {
+    font-family: var(--font-head);
+    font-weight: 900;
+    font-size: clamp(2.4rem, 13vw, 3.75rem);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+
+  .rule {
+    width: 3.5rem;
+    height: 2px;
+    margin: 1.5rem auto;
+    background: var(--copper);
+  }
+
+  .notice {
+    color: var(--text);
+    font-size: 1.0625rem;
+  }
+
+  .email {
+    display: inline-block;
+    margin-top: 2rem;
+    font-size: 0.875rem;
+    letter-spacing: 0.01em;
+    color: var(--steel);
+    text-decoration: none;
+    border-bottom: 1px solid var(--panel-edge);
+    padding-bottom: 0.2rem;
+  }
+
+  .email:hover,
+  .email:focus-visible {
+    color: var(--gold-bright);
+    border-bottom-color: var(--gold-dim);
+  }
+</style>
