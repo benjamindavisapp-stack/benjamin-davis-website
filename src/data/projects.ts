@@ -179,7 +179,7 @@ export const PROJECTS: Project[] = [
     role:       'Designer, maker, owner',
     status:     'Ongoing',
     summary:
-      'Custom business cards that need CAD, CAM and six manufacturing processes each: an SLS-printed frame, CNC-machined brass lettering, laser-cut acrylic, anodizing, multi-color and resin printing, and an embedded NFC tag that opens this site.',
+      'Custom business cards that need CAD, CAM and four manufacturing processes each: CNC-machined brass lettering, laser-cut acrylic, multi-color FDM and resin printing, plus an embedded NFC tag that opens this site. The next version adds an SLS-printed frame and anodizing.',
     tags:     ['CNC', 'SLS', 'Anodizing', 'NFC', 'Product Design'],
     cover:    '/images/projects/bdcards-card.webp',
     coverAlt: 'A finished BD card held in hand — machined frame, lattice infill, and raised BENJAMIN DAVIS / ADVANCED MANUFACTURING lettering',

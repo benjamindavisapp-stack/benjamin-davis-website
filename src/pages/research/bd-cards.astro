@@ -17,7 +17,8 @@ const p = getProject('bd-cards');
   overview={p.summary}
   ogImage={p.cover}
   specs={[
-    { key: 'Processes per card', value: '6' },
+    { key: 'Processes per card', value: '4' },
+    { key: 'Next version',       value: '6' },
     { key: 'Tap target',         value: 'This site' },
   ]}
   {...getNeighbours(p.slug)}
@@ -25,7 +26,7 @@ const p = getProject('bd-cards');
 
   <ProjectSection num="01" title="A business card as a manufacturing exercise" dark>
     <p>
-      A paper business card gets thrown away. One that takes six manufacturing
+      A paper business card gets thrown away. One that takes four manufacturing
       processes to make does not — and making it is the point. Every card is a
       complete CAD-to-CAM-to-part exercise at a scale small enough to iterate
       on in an evening.
@@ -52,28 +53,34 @@ const p = getProject('bd-cards');
     />
   </ProjectSection>
 
-  <ProjectSection num="02" title="The six processes">
+  <ProjectSection num="02" title="The processes">
     <SpecTable
-      caption="One card, six processes"
-      head={['Process', 'What it makes']}
+      caption="What goes into a card today"
+      head={['Process', 'What it makes', 'Machine']}
       rows={[
-        { key: 'SLS printing',        value: 'The card frame' },
-        { key: 'CNC machining',       value: 'Brass lettering' },
-        { key: 'Laser cutting',       value: 'Acrylic layer' },
-        { key: 'Anodizing',           value: 'Surface finish and color' },
-        { key: 'Multi-color FDM',    value: 'Two-tone printed detail' },
-        { key: 'Resin printing',      value: 'Fine-feature parts' },
+        { key: 'CNC machining',    value: 'Brass lettering',        note: 'Genmitsu 3030 ProVer' },
+        { key: 'Laser cutting',    value: 'Acrylic layer',          note: '—' },
+        { key: 'Multi-color FDM',  value: 'Two-tone printed detail', note: 'Bambu Lab X2D / A1' },
+        { key: 'Resin printing',   value: 'Fine-feature parts',      note: 'Creality Halot R6' },
       ]}
     />
     <p>
-      The NFC tag is not a seventh process — it is a component the six have to
-      make room for.
+      The NFC tag is not a fifth process — it is a component the four have to
+      make room for. It has to sit deep enough to survive handling and shallow
+      enough to read through the face.
     </p>
     <p>
-      Each process constrains the next. The SLS frame sets the pockets the
-      brass has to land in; the anodizing has to happen before anything heat-
-      sensitive goes in; the NFC tag has to be buried deep enough to survive
-      handling and shallow enough to read through the face.
+      Each process constrains the next. The frame sets the pockets the brass
+      has to land in, the acrylic has to index off those same pockets, and
+      every tolerance stacks toward the one face anyone actually looks at.
+    </p>
+
+    <h3>Coming in the next version</h3>
+    <p>
+      Two more processes are designed in but not yet on a card I have handed
+      anyone: an <strong>SLS-printed frame</strong> in place of the current
+      one, and <strong>anodizing</strong> for the surface finish. Both are
+      what the next revision is for.
     </p>
   </ProjectSection>
 
