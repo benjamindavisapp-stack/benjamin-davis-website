@@ -383,8 +383,8 @@ export interface Software {
 }
 
 export const SOFTWARE: Software[] = [
-  { name: 'Fusion 360',   role: 'Parametric CAD and CAM for every machined and printed part — Autodesk CAM certified, mill and turn' },
-  { name: 'SolidWorks',   role: 'CAD — Certified SolidWorks Associate (CSWA)' },
+  { name: 'Fusion 360',   role: 'Parametric CAD and CAM for every machined and printed part — working toward the Autodesk CAM certification, mill and turn' },
+  { name: 'SolidWorks',   role: 'CAD — working toward the Certified SolidWorks Associate (CSWA)' },
   { name: 'OnShape',      role: 'Cloud CAD for quick iterations, and for handing a model to someone else' },
   { name: 'Fritzing',     role: 'Schematic capture and board layout for the milled PCBs' },
   { name: 'Bambu Studio', role: 'Slicing for every FDM job, including multi-color setup' },
