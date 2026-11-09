@@ -1130,13 +1130,10 @@ const pcbId = id ?? ('pcb-' + Math.random().toString(36).slice(2, 8));
 
         /* ── BOARD SETTLE ───────────────────────────────────────────────── */
         if (ph.name === 'board') {
-          // Full alpha, not a fade. The board is already on screen at full
-          // opacity from the pre-delay draw above, so ramping alpha from 0
-          // here dropped it to black the instant the loop started and faded
-          // it back in — a visible flash across the whole DELAY boundary.
-          // The fiducials are what actually settle in during this phase.
           bCtx.clearRect(0, 0, W, H);
+          bCtx.globalAlpha = eio(pt);
           bCtx.drawImage(boardOff, 0, 0, W, H);
+          bCtx.globalAlpha = 1;
           drawFiducials(bCtx, W, H, fidF, BOARD_BG[MC] || BOARD_BG.green);
 
         /* ── CUT: routing head cuts the channel (45°/90°), no copper yet ── */

@@ -4,7 +4,7 @@ import Lattice    from '@/components/Lattice.astro';
 import Bolt       from '@/components/Bolt.astro';
 import PCBText    from '@/components/PCBText.astro';
 
-const email    = 'BenjaminDavis.build@gmail.com';
+const email    = 'benjamindavisma@gmail.com';
 const linkedin = 'https://www.linkedin.com/in/benjamin-davis-60726635a/';
 
 const links = [
@@ -154,7 +154,7 @@ const links = [
     const message = (form.elements.namedItem('message') as HTMLTextAreaElement).value.trim();
 
     const body = `Name: ${name}\nEmail: ${replyTo}\n\n${message}`;
-    const mailto = `mailto:BenjaminDavis.build@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const mailto = `mailto:benjamindavisma@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailto;
   });
 </script>

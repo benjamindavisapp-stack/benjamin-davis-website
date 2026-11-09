@@ -1,0 +1,581 @@
+---
+import Layout  from '@/layouts/Layout.astro';
+import Lattice from '@/components/Lattice.astro';
+import Bolt    from '@/components/Bolt.astro';
+import FDMText from '@/components/FDMText.astro';
+
+const additive = [
+  {
+    name:    'Bambu Lab H2C',
+    type:    'FDM 3D Printer',
+    specs: [
+      { key: 'Build volume',  val: '256 × 256 × 256 mm' },
+      { key: 'Speed',         val: 'Up to 600 mm/s' },
+      { key: 'Min layer',     val: '0.05 mm' },
+      { key: 'Multi-material', val: 'AMS system' },
+    ],
+    notes:   'Primary printer for rapid prototyping, jigs, fixtures, and TechForge student projects. Secured via ISEF winnings for Bishop Feehan\'s fabrication lab.',
+    image:   '/images/printer-bambu.jpg',
+    imageAlt: 'Bambu Lab H2C 3D printer in the fabrication lab',
+  },
+  {
+    name:    'FDM Workshop Printer',
+    type:    'FDM 3D Printer',
+    specs: [
+      { key: 'Location', val: 'Home workshop' },
+      { key: 'Use case', val: 'Overnight runs, filament R&D' },
+    ],
+    notes:   'At-home unit used for overnight production runs, iterating on the recycled-filament output quality, and parts that need monitoring.',
+    image:   null,
+    imageAlt: 'Workshop FDM printer',
+  },
+];
+
+const cnc = [
+  {
+    name:    'CNC Router / Mill',
+    type:    'Subtractive Manufacturing',
+    specs: [
+      { key: 'Application', val: 'Precision panel routing, engraving' },
+      { key: 'Materials',   val: 'Aluminum, brass, acrylic, wood' },
+    ],
+    notes:   'Used to machine the brass business card engraving plates, fixture plates for the extrusion system, and custom panel cutouts.',
+    image:   null,
+    imageAlt: 'CNC router machining a metal workpiece',
+  },
+  {
+    name:    'Drill Press & Bench Tools',
+    type:    'Manual Machining',
+    specs: [
+      { key: 'Tools', val: 'Drill press, tap & die set, files, vise' },
+    ],
+    notes:   'Core hand-tool set used to complete the 800+ hours of fabrication on the extrusion machine. Precise hole placement, thread cutting, and manual finishing.',
+    image:   null,
+    imageAlt: 'Bench tools in the home workshop',
+  },
+];
+
+const electronics = [
+  {
+    name:    'Soldering Station',
+    type:    'Electronics Fabrication',
+    specs: [
+      { key: 'Type',   val: 'Temperature-controlled iron' },
+      { key: 'Use',    val: 'PCB assembly, wire harnesses, sensors' },
+    ],
+    notes:   'Used for all custom electronics in the extrusion system: motor driver boards, thermocouple wiring, control panel assemblies.',
+    image:   null,
+    imageAlt: 'Temperature-controlled soldering station on electronics bench',
+  },
+  {
+    name:    'Digital Instruments',
+    type:    'Measurement & Test',
+    specs: [
+      { key: 'DMM',       val: 'Fluke / benchtop multimeter' },
+      { key: 'Calipers',  val: 'Digital, 0.01 mm resolution' },
+      { key: 'Filament gauge', val: '0.001 mm micrometer' },
+    ],
+    notes:   'Measurement tooling critical to validating filament diameter within commercial tolerances (±0.05 mm). Calipers used on every manufactured component.',
+    image:   null,
+    imageAlt: 'Digital calipers measuring a machined part',
+  },
+  {
+    name:    'Microcontroller Platform',
+    type:    'Embedded Control',
+    specs: [
+      { key: 'Platform', val: 'Arduino (various)' },
+      { key: 'IDE',      val: 'Arduino IDE + Fritzing for PCB design' },
+    ],
+    notes:   'Control system for motor speed, temperature PID loops, and sensor data acquisition in the From Crude to Extrude machine.',
+    image:   null,
+    imageAlt: 'Arduino microcontroller board with wired peripherals',
+  },
+];
+
+const research = [
+  {
+    name:    'From Crude to Extrude — Extrusion/Pultrusion System',
+    type:    'Custom Research Apparatus',
+    specs: [
+      { key: 'Sub-systems',   val: '7 integrated' },
+      { key: 'Parts',         val: '30+ CAD-designed & manufactured' },
+      { key: 'Build time',    val: '800+ hours over 8 months' },
+      { key: 'Output',        val: 'Filament to ±0.05 mm tolerance' },
+      { key: 'Energy saving', val: '~43 % vs. standard re-extrusion' },
+    ],
+    notes:   'The flagship machine: a novel combination of extrusion and pultrusion that recycles PET bottle waste and 3D-printing purge material into additive manufacturing filament. Built entirely in the home workshop from scratch. Produced 1st-place ISEF results and the Regeneron Young Scientist Award.',
+    href:    '/research/from-crude-to-extrude',
+    image:   '/images/machine-full.jpg',
+    imageAlt: 'The From Crude to Extrude recycling machine at ISEF 2025',
+    featured: true,
+  },
+];
+
+const software = [
+  { name: 'Fusion 360',   role: 'Parametric CAD & CAM for all machined and 3D-printed parts' },
+  { name: 'OnShape',      role: 'Cloud-based CAD for collaborative and quick-iterate designs' },
+  { name: 'Fritzing',     role: 'PCB schematic and board layout for custom electronics' },
+  { name: 'Bambu Studio', role: 'Slicer for all Bambu Lab print jobs; multi-color setup' },
+  { name: 'Arduino IDE',  role: 'Firmware development for embedded control systems' },
+];
+---
+
+<Layout
+  title="Equipment — Benjamin Davis"
+  description="The machines, tools, and software Benjamin Davis uses for advanced manufacturing research, 3D printing, CNC machining, and electronics fabrication."
+>
+
+  <!-- ── Hero ───────────────────────────────────────────────────────────────── -->
+  <section class="hero">
+    <Lattice />
+    <Bolt position="tl" />
+    <Bolt position="tr" />
+    <Bolt position="bl" />
+    <Bolt position="br" />
+    <div class="container hero-body">
+      <p class="hero-eyebrow">Workshop &amp; Lab</p>
+      <FDMText id="equip-hero" duration={3.5} delay={0.4}>
+        <h1 class="hero-heading">
+          The machines<br/>
+          <span class="gold">behind the work.</span>
+        </h1>
+      </FDMText>
+      <p class="hero-sub">
+        Fabrication &middot; Measurement &middot; Research apparatus
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 01 Additive Manufacturing ──────────────────────────────────────────── -->
+  <section class="equip-section">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">01</p>
+        <FDMText id="equip-sec-01" duration={2.2} trigger="scroll" delay={0.05}>
+          <h2 class="section-title">Additive Manufacturing</h2>
+        </FDMText>
+      </div>
+
+      <div class="equip-grid">
+        {additive.map(item => (
+          <article class="equip-card">
+            {item.image
+              ? <div class="card-image-wrap">
+                  <img src={item.image} alt={item.imageAlt}
+                    width="600" height="400" loading="lazy" />
+                </div>
+              : <figure class="img-placeholder" style="aspect-ratio:3/2;"
+                  data-label={`[Photo: ${item.imageAlt}]`} aria-hidden="true">
+                </figure>
+            }
+            <div class="card-body">
+              <p class="card-type">{item.type}</p>
+              <h3 class="card-name">{item.name}</h3>
+              <table class="spec-table">
+                {item.specs.map(s => (
+                  <tr>
+                    <th>{s.key}</th>
+                    <td>{s.val}</td>
+                  </tr>
+                ))}
+              </table>
+              <p class="card-notes">{item.notes}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 02 CNC & Machining ─────────────────────────────────────────────────── -->
+  <section class="equip-section equip-section--dark">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">02</p>
+        <FDMText id="equip-sec-02" duration={2.2} trigger="scroll" delay={0.05}>
+          <h2 class="section-title">CNC &amp; Machining</h2>
+        </FDMText>
+      </div>
+
+      <div class="equip-grid">
+        {cnc.map(item => (
+          <article class="equip-card">
+            {item.image
+              ? <div class="card-image-wrap">
+                  <img src={item.image} alt={item.imageAlt}
+                    width="600" height="400" loading="lazy" />
+                </div>
+              : <figure class="img-placeholder" style="aspect-ratio:3/2;"
+                  data-label={`[Photo: ${item.imageAlt}]`} aria-hidden="true">
+                </figure>
+            }
+            <div class="card-body">
+              <p class="card-type">{item.type}</p>
+              <h3 class="card-name">{item.name}</h3>
+              <table class="spec-table">
+                {item.specs.map(s => (
+                  <tr><th>{s.key}</th><td>{s.val}</td></tr>
+                ))}
+              </table>
+              <p class="card-notes">{item.notes}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 03 Electronics & Measurement ──────────────────────────────────────── -->
+  <section class="equip-section">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">03</p>
+        <FDMText id="equip-sec-03" duration={2.0} trigger="scroll" delay={0.05}>
+          <h2 class="section-title">Electronics &amp; Measurement</h2>
+        </FDMText>
+      </div>
+
+      <div class="equip-grid equip-grid--three">
+        {electronics.map(item => (
+          <article class="equip-card">
+            {item.image
+              ? <div class="card-image-wrap">
+                  <img src={item.image} alt={item.imageAlt}
+                    width="600" height="400" loading="lazy" />
+                </div>
+              : <figure class="img-placeholder" style="aspect-ratio:3/2;"
+                  data-label={`[Photo: ${item.imageAlt}]`} aria-hidden="true">
+                </figure>
+            }
+            <div class="card-body">
+              <p class="card-type">{item.type}</p>
+              <h3 class="card-name">{item.name}</h3>
+              <table class="spec-table">
+                {item.specs.map(s => (
+                  <tr><th>{s.key}</th><td>{s.val}</td></tr>
+                ))}
+              </table>
+              <p class="card-notes">{item.notes}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 04 Research Apparatus ──────────────────────────────────────────────── -->
+  <section class="equip-section equip-section--dark">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">04</p>
+        <FDMText id="equip-sec-04" duration={2.0} trigger="scroll" delay={0.05}>
+          <h2 class="section-title">Research Apparatus</h2>
+        </FDMText>
+      </div>
+
+      {research.map(item => (
+        <article class="featured-card">
+          {item.image
+            ? <div class="fc-image-wrap">
+                <img src={item.image} alt={item.imageAlt}
+                  width="800" height="500" loading="lazy" />
+              </div>
+            : <figure class="img-placeholder fc-image-placeholder"
+                data-label={`[Photo: ${item.imageAlt}]`} aria-hidden="true">
+              </figure>
+          }
+          <div class="fc-body">
+            <p class="card-type">{item.type}</p>
+            <h3 class="fc-name">{item.name}</h3>
+            <table class="spec-table spec-table--featured">
+              {item.specs.map(s => (
+                <tr><th>{s.key}</th><td>{s.val}</td></tr>
+              ))}
+            </table>
+            <p class="card-notes fc-notes">{item.notes}</p>
+            {item.href && (
+              <a href={item.href} class="fc-link">
+                Full project write-up →
+              </a>
+            )}
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <!-- ── 05 Software & Design Tools ────────────────────────────────────────── -->
+  <section class="equip-section">
+    <div class="container">
+      <div class="section-header">
+        <p class="section-overline">05</p>
+        <FDMText id="equip-sec-05" duration={2.0} trigger="scroll" delay={0.05}>
+          <h2 class="section-title">Software &amp; Design Tools</h2>
+        </FDMText>
+      </div>
+
+      <ul class="software-list">
+        {software.map(s => (
+          <li class="software-item">
+            <span class="sw-name">{s.name}</span>
+            <span class="sw-role">{s.role}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  /* ── Hero ─────────────────────────────────────────────────────────────────── */
+  .hero {
+    position: relative;
+    padding-block: 5rem 4rem;
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .hero-body {
+    position: relative;
+    z-index: 1;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+  .hero-heading {
+    font-family: var(--font-head);
+    font-size: clamp(2rem, 7vw, 3.5rem);
+    font-weight: 900;
+    line-height: 1.05;
+    color: var(--text);
+  }
+  .hero-sub {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--steel);
+  }
+
+  /* ── Sections ─────────────────────────────────────────────────────────────── */
+  .equip-section {
+    padding-block: 4rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .equip-section--dark { background: var(--panel); }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .section-overline {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    color: var(--copper);
+    flex-shrink: 0;
+  }
+  .section-title {
+    font-family: var(--font-head);
+    font-size: clamp(1.5rem, 5vw, 2.2rem);
+    font-weight: 900;
+    color: var(--text);
+  }
+
+  /* ── Equipment grid ───────────────────────────────────────────────────────── */
+  .equip-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1px;
+    border: 1px solid var(--panel-edge);
+  }
+  .equip-grid--three {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+
+  /* ── Equipment card ───────────────────────────────────────────────────────── */
+  .equip-card {
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+  }
+  .card-image-wrap {
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .card-image-wrap img {
+    width: 100%;
+    aspect-ratio: 3/2;
+    object-fit: cover;
+    filter: brightness(0.85) contrast(1.08);
+    display: block;
+    transition: filter 0.3s;
+  }
+  .equip-card:hover .card-image-wrap img { filter: brightness(0.92) contrast(1.06); }
+
+  .img-placeholder {
+    background: var(--graphite);
+    border-bottom: 1px solid var(--panel-edge);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--steel);
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    padding: 0.75rem;
+    text-align: center;
+  }
+  .img-placeholder::before { content: attr(data-label); }
+
+  .card-body {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    flex: 1;
+  }
+  .card-type {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+  .card-name {
+    font-family: var(--font-head);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .card-notes {
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--steel);
+    margin-top: auto;
+    padding-top: 0.4rem;
+  }
+
+  /* ── Spec table ───────────────────────────────────────────────────────────── */
+  .spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.76rem;
+  }
+  .spec-table tr { border-bottom: 1px solid var(--panel-edge); }
+  .spec-table tr:last-child { border-bottom: none; }
+  .spec-table th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-weight: 400;
+    color: var(--steel);
+    padding: 0.28rem 0.5rem 0.28rem 0;
+    width: 40%;
+    vertical-align: top;
+  }
+  .spec-table td {
+    color: var(--text);
+    padding: 0.28rem 0;
+    vertical-align: top;
+  }
+  .spec-table--featured th { width: 30%; }
+
+  /* ── Featured research card ───────────────────────────────────────────────── */
+  .featured-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1px solid var(--panel-edge);
+    background: var(--graphite);
+    overflow: hidden;
+  }
+  .fc-image-wrap { overflow: hidden; }
+  .fc-image-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: brightness(0.85) contrast(1.08);
+    display: block;
+  }
+  .fc-image-placeholder {
+    min-height: 280px;
+    background: var(--panel);
+    border-right: 1px solid var(--panel-edge);
+  }
+  .fc-body {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .fc-name {
+    font-family: var(--font-head);
+    font-size: clamp(1.1rem, 3vw, 1.55rem);
+    font-weight: 900;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .fc-notes { font-size: 0.83rem; line-height: 1.65; color: var(--steel); }
+  .fc-link {
+    display: inline-block;
+    margin-top: auto;
+    font-family: var(--font-mono);
+    font-size: 0.70rem;
+    letter-spacing: 0.06em;
+    color: var(--copper);
+    border-bottom: 1px solid currentColor;
+    padding-bottom: 1px;
+    transition: color 0.15s;
+  }
+  .fc-link:hover { color: var(--gold-bright); }
+
+  /* ── Software list ────────────────────────────────────────────────────────── */
+  .software-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--panel-edge);
+  }
+  .software-item {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid var(--panel-edge);
+    transition: background 0.15s;
+  }
+  .software-item:last-child { border-bottom: none; }
+  .software-item:hover { background: var(--panel); }
+  .sw-name {
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gold);
+    min-width: 130px;
+    flex-shrink: 0;
+  }
+  .sw-role { font-size: 0.82rem; color: var(--steel); line-height: 1.5; }
+
+  /* ── Gold accent ──────────────────────────────────────────────────────────── */
+  .gold { color: var(--gold); }
+
+  /* ── Responsive ───────────────────────────────────────────────────────────── */
+  @media (max-width: 680px) {
+    .featured-card { grid-template-columns: 1fr; }
+    .fc-image-wrap { max-height: 200px; }
+    .fc-body { padding: 1.25rem; }
+    .software-item { flex-direction: column; gap: 0.25rem; }
+    .sw-name { min-width: unset; }
+  }
+</style>
