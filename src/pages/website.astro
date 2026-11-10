@@ -175,6 +175,24 @@ const tokens = [
           <p>Interested in a precision-machined metal business card of your own? I design and produce bespoke cards — same materials, same tolerances, same process — tailored to your specifications.</p>
           <p>Each card is machined from 6061-T6 aluminium, type-II anodised, laser-engraved with metallic fill, and finished with a custom inlay. Lead time and pricing depend on quantity and complexity.</p>
           <a href="/contact" class="commission-cta">Get in touch &rarr;</a>
+
+          <form class="order-key" id="order-key-form">
+            <label class="order-key-label" for="order-key">Have an order key?</label>
+            <div class="order-key-row">
+              <input
+                id="order-key"
+                class="order-key-input"
+                type="text"
+                placeholder="Order key"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                required
+              />
+              <button type="submit" class="order-key-btn">Open &rarr;</button>
+            </div>
+            <p class="order-key-note">Opens the card viewer, where you can build a card and check out.</p>
+          </form>
         </div>
         <div class="commission-spec">
           <p class="spec-label">What's configurable</p>
@@ -220,6 +238,18 @@ const tokens = [
   </section>
 
 </Layout>
+
+<script>
+  /* Hand the key straight to /order as a fragment, so it never reaches a server
+     and the order page — the only thing holding the encrypted viewer — decides
+     whether it opens. */
+  const keyForm = document.getElementById('order-key-form') as HTMLFormElement | null;
+  keyForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const key = (document.getElementById('order-key') as HTMLInputElement).value.trim();
+    if (key) window.location.href = '/order/#k=' + encodeURIComponent(key);
+  });
+</script>
 
 <style>
   /* ── Hero ─────────────────────────────────────────────────────────────── */
@@ -506,6 +536,75 @@ const tokens = [
   .commission-cta:focus-visible {
     outline: 2px solid var(--copper);
     outline-offset: 3px;
+  }
+
+  /* ── Order key ───────────────────────────────────────────────────────── */
+  /* The key is not checked here: it is handed to /order, which is the only
+     place that can tell a good key from a bad one. */
+  .order-key {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--panel-edge);
+    max-width: 24rem;
+  }
+  .order-key-label {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+  .order-key-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .order-key-input {
+    flex: 1;
+    min-width: 0;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    letter-spacing: 0.04em;
+    padding: 0.55rem 0.7rem;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  .order-key-input::placeholder { color: var(--steel); opacity: 0.55; }
+  .order-key-input:focus { border-color: var(--copper); }
+  .order-key-input:focus-visible {
+    outline: 2px solid var(--copper);
+    outline-offset: 3px;
+  }
+  .order-key-btn {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--graphite);
+    background: var(--gold);
+    border: 1px solid var(--gold);
+    padding: 0.55rem 0.9rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .order-key-btn:hover { background: var(--gold-bright); }
+  .order-key-btn:focus-visible {
+    outline: 2px solid var(--copper);
+    outline-offset: 3px;
+  }
+  .order-key-note {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.04em;
+    color: var(--steel);
+    margin: 0;
   }
 
   /* ── Responsive ───────────────────────────────────────────────────────── */

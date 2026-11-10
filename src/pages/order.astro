@@ -1,0 +1,525 @@
+---
+/* Unlisted, password-gated card ordering page.
+ *
+ * Nothing links here and it carries noindex, so it is reachable only from a link
+ * that is sent out. The viewer itself is not in this page's source: it is fetched
+ * as an AES-GCM blob (public/order/card-viewer.enc, built by order-seal.mjs) and
+ * decrypted in the browser with the password, then mounted in an iframe so its
+ * global CSS cannot touch the site. A wrong password fails the GCM auth tag, so
+ * there is no plaintext to find without it.
+ *
+ * Checkout emails ORDER_TO through Web3Forms. Until an access key is pasted into
+ * PUBLIC_ORDER_FORM_KEY, checkout falls back to opening the customer's mail app.
+ */
+import Layout from '@/layouts/Layout.astro';
+
+const ORDER_TO = 'benjamindavis.build@gmail.com';
+
+/* Access key from web3forms.com, created against ORDER_TO so submissions land
+ * there. It is a public, client-side key by design, so it can live here — or in
+ * PUBLIC_ORDER_FORM_KEY in the Vercel environment, which wins. While both are
+ * blank, checkout falls back to the customer's mail app. */
+const FORM_KEY_HERE = 'cb2f4c60-5dd8-471a-9851-7c2f01f1d181';
+const FORM_KEY = (import.meta.env.PUBLIC_ORDER_FORM_KEY || FORM_KEY_HERE).trim();
+const KDF_ITER = 310000;                                        // must match order-seal.mjs
+const BLOB_URL = '/order/card-viewer.enc';
+---
+
+<Layout
+  title="Order a card — BD Solutions"
+  description="Private card ordering page."
+  noindex={true}
+>
+  <!-- ── Locked ──────────────────────────────────────────────────────────── -->
+  <section class="od-gate" id="od-gate">
+    <div class="od-gate-box">
+      <p class="overline">BD Solutions</p>
+      <h1 class="od-gate-head">Card orders</h1>
+      <p class="od-gate-note">This page is private. Enter your order key to open the viewer.</p>
+
+      <form class="od-gate-form" id="od-gate-form">
+        <label class="field-label" for="od-pw">Order key</label>
+        <input
+          id="od-pw"
+          type="password"
+          class="field-input"
+          placeholder="••••••••"
+          autocomplete="current-password"
+          spellcheck="false"
+          required
+        />
+        <button type="submit" class="od-btn" id="od-unlock">Unlock</button>
+      </form>
+
+      <p class="od-msg" id="od-gate-msg" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- ── Unlocked ────────────────────────────────────────────────────────── -->
+  <div id="od-vault" hidden>
+    <section class="od-hero">
+      <div class="od-wide">
+        <p class="overline">Order a card</p>
+        <h1 class="od-head">Build it, then check out.</h1>
+        <p class="od-sub">
+          Configure the card below — style, materials, lettering, QR and NFC. When it looks right,
+          add your name and email and press checkout. The full spec comes straight to the shop.
+        </p>
+      </div>
+    </section>
+
+    <section class="od-viewer-sec">
+      <div class="od-wide">
+        <div class="od-frame-wrap">
+          <iframe id="od-frame" class="od-frame" title="BD Solutions card viewer"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <section class="od-checkout" id="od-checkout">
+      <div class="od-wide od-checkout-inner">
+        <div class="od-checkout-head">
+          <p class="overline">Checkout</p>
+          <p class="od-checkout-note">Your design is attached automatically. No payment is taken here — the quote comes back by email first.</p>
+        </div>
+
+        <form class="od-form" id="od-form">
+          <div class="field-row">
+            <div class="field">
+              <label for="od-name" class="field-label">Name</label>
+              <input id="od-name" name="name" type="text" class="field-input" placeholder="Your name" autocomplete="name" required />
+            </div>
+            <div class="field">
+              <label for="od-email" class="field-label">Email</label>
+              <input id="od-email" name="email" type="email" class="field-input" placeholder="you@example.com" autocomplete="email" required />
+            </div>
+          </div>
+
+          <input type="checkbox" name="botcheck" class="od-hp" tabindex="-1" aria-hidden="true" />
+
+          <button type="submit" class="od-btn od-btn--go" id="od-checkout-btn">Checkout →</button>
+          <p class="od-msg" id="od-form-msg" role="status" aria-live="polite"></p>
+        </form>
+
+        <details class="od-spec-peek">
+          <summary>Review the spec being sent</summary>
+          <pre class="od-spec" id="od-spec-preview">Build a card above and the spec appears here.</pre>
+        </details>
+      </div>
+    </section>
+  </div>
+</Layout>
+
+<script is:inline define:vars={{ ORDER_TO, FORM_KEY, KDF_ITER, BLOB_URL }}>
+  (() => {
+    'use strict';
+    const $ = (id) => document.getElementById(id);
+    const gate = $('od-gate'), vault = $('od-vault'), gateMsg = $('od-gate-msg'), frame = $('od-frame');
+
+    const say = (el, text, bad) => { el.textContent = text; el.classList.toggle('od-msg--bad', !!bad); };
+
+    /* ── unlock ─────────────────────────────────────────────────────────── */
+    async function decrypt(password) {
+      const res = await fetch(BLOB_URL, { cache: 'no-store' });
+      if (!res.ok) throw new Error('blob');
+      const raw = Uint8Array.from(atob((await res.text()).trim()), (c) => c.charCodeAt(0));
+      const material = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey'],
+      );
+      const key = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: raw.slice(0, 16), iterations: KDF_ITER, hash: 'SHA-256' },
+        material, { name: 'AES-GCM', length: 256 }, false, ['decrypt'],
+      );
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.slice(16, 28) }, key, raw.slice(28));
+      return new TextDecoder().decode(plain);
+    }
+
+    async function unlock(password, quiet) {
+      if (!password) return false;
+      if (!window.crypto || !crypto.subtle) {
+        say(gateMsg, 'This browser cannot unlock the page over an insecure connection. Open it over https.', true);
+        return false;
+      }
+      const btn = $('od-unlock');
+      btn.disabled = true;
+      say(gateMsg, 'Unlocking…');
+      let html;
+      try {
+        html = await decrypt(password);
+      } catch (err) {
+        btn.disabled = false;
+        if (err && err.message === 'blob') say(gateMsg, 'The viewer could not be loaded. Reload the page, or let the shop know.', true);
+        else say(gateMsg, quiet ? '' : 'That key does not open this page.', !quiet);
+        return false;
+      }
+      btn.disabled = false;
+      say(gateMsg, '');
+      gate.hidden = true;
+      vault.hidden = false;
+      frame.srcdoc = html;
+      return true;
+    }
+
+    $('od-gate-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      unlock($('od-pw').value.trim(), false);
+    });
+
+    /* A sent link can carry the password: /order#k=... — a fragment never reaches
+       a server and is dropped from the URL bar as soon as it is used. */
+    (async () => {
+      const m = /(?:^|[#&])k=([^&]+)/.exec(location.hash || '');
+      if (!m) return;
+      const sent = decodeURIComponent(m[1]);
+      history.replaceState(null, '', location.pathname + location.search);
+      if (await unlock(sent, true)) return;
+      say(gateMsg, 'That key does not open this page. Check it and try again.', true);
+    })();
+
+    /* ── read the design out of the viewer ──────────────────────────────── */
+    /* The viewer already renders its own spec, design code and price into #spec
+       on its Send tab, so switch to that tab and read it rather than duplicating
+       any of that logic here. */
+    function readSpec() {
+      const doc = frame.contentDocument;
+      if (!doc) return null;
+      const send = doc.getElementById('tab-send');
+      const open = Array.from(doc.querySelectorAll('[role="tab"]'))
+        .find((t) => t.getAttribute('aria-selected') === 'true');
+      if (send && send !== open) send.click();
+      const pre = doc.getElementById('spec');
+      const spec = pre && pre.textContent.trim() ? pre.textContent.trim() : null;
+      if (open && send && open !== send) open.click();   // put the viewer back where it was
+      return spec;
+    }
+
+    const lineFrom = (spec, label) => {
+      const hit = spec.split('\n').find((l) => l.trim().toLowerCase().startsWith(label.toLowerCase()));
+      return hit ? hit.split(':').slice(1).join(':').trim() : '';
+    };
+
+    /* ── checkout ───────────────────────────────────────────────────────── */
+    const form = $('od-form'), formMsg = $('od-form-msg');
+    const hasKey = typeof FORM_KEY === 'string' && FORM_KEY.length > 10;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (form.elements.botcheck.checked) return;
+
+      const name = $('od-name').value.trim(), email = $('od-email').value.trim();
+      if (!name || !email) { say(formMsg, 'Add your name and email first.', true); return; }
+
+      const spec = readSpec();
+      if (!spec) {
+        say(formMsg, 'The design could not be read. Scroll up, open the viewer and try again.', true);
+        return;
+      }
+      $('od-spec-preview').textContent = spec;
+
+      const btn = $('od-checkout-btn');
+      btn.disabled = true;
+      say(formMsg, 'Placing the order…');
+
+      const body = ['Name:  ' + name, 'Email: ' + email, 'Placed: ' + new Date().toString(), '', spec].join('\n');
+
+      if (!hasKey) {
+        /* No form key configured yet, so hand off to the customer's mail app and
+           the page still works — the same pattern the contact page uses. */
+        location.href = 'mailto:' + ORDER_TO
+          + '?subject=' + encodeURIComponent('Card order — ' + name)
+          + '&body=' + encodeURIComponent(body);
+        btn.disabled = false;
+        say(formMsg, 'Your mail app is opening with the whole order filled in — press send to place it.');
+        return;
+      }
+
+      try {
+        const res = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            access_key: FORM_KEY,
+            subject: 'Card order — ' + name,
+            from_name: 'BD Solutions order page',
+            replyto: email,
+            name,
+            email,
+            price: lineFrom(spec, 'Estimated price'),
+            design_code: lineFrom(spec, 'Design code'),
+            message: body,
+          }),
+        });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok || out.success === false) throw new Error(out.message || 'send failed');
+        form.reset();
+        say(formMsg, 'Order placed. A quote will come back to ' + email + '.');
+      } catch (err) {
+        say(formMsg, 'The order did not go through. Email ' + ORDER_TO + ' directly, or try again.', true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    /* Fill the preview when it is actually opened, so the viewer is left on
+       whatever tab the customer was using. */
+    document.querySelector('.od-spec-peek').addEventListener('toggle', (e) => {
+      if (!e.target.open) return;
+      const spec = readSpec();
+      if (spec) $('od-spec-preview').textContent = spec;
+    });
+  })();
+</script>
+
+<style>
+  /* ── Shared ──────────────────────────────────────────────────────────── */
+  .od-wide {
+    width: 100%;
+    max-width: 1180px;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  .overline {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+
+  .field-label {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--copper);
+  }
+
+  .field-input {
+    background: var(--graphite);
+    border: 1px solid var(--panel-edge);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 0.88rem;
+    padding: 0.65rem 0.8rem;
+    width: 100%;
+    transition: border-color 0.15s;
+    outline: none;
+    -webkit-appearance: none;
+  }
+
+  .field-input::placeholder { color: var(--steel); opacity: 0.6; }
+  .field-input:focus { border-color: var(--copper); }
+  .field-input:focus-visible { outline: 2px solid var(--copper); outline-offset: 3px; }
+
+  .od-btn {
+    padding: 0.7rem 1.6rem;
+    background: transparent;
+    border: 1px solid var(--copper);
+    color: var(--copper);
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, opacity 0.15s;
+  }
+
+  .od-btn:hover:not(:disabled) { background: var(--copper); color: var(--graphite); }
+  .od-btn:focus-visible { outline: 2px solid var(--copper); outline-offset: 3px; }
+  .od-btn:disabled { opacity: 0.5; cursor: progress; }
+
+  .od-btn--go {
+    align-self: flex-start;
+    background: var(--gold);
+    border-color: var(--gold);
+    color: var(--graphite);
+    font-weight: 900;
+  }
+
+  .od-btn--go:hover:not(:disabled) { background: var(--gold-bright); color: var(--graphite); }
+
+  .od-msg {
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.04em;
+    color: var(--steel);
+    min-height: 1.1rem;
+    line-height: 1.5;
+  }
+
+  .od-msg--bad { color: var(--copper); }
+
+  /* The display rules below outrank the UA style for [hidden], so say it here. */
+  #od-gate[hidden], #od-vault[hidden] { display: none; }
+
+  /* ── Gate ────────────────────────────────────────────────────────────── */
+  .od-gate {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(3rem, 12vh, 7rem) 1.25rem;
+  }
+
+  .od-gate-box {
+    width: 100%;
+    max-width: 380px;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    padding: 2rem 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .od-gate-head {
+    font-family: var(--font-head);
+    font-size: 2.1rem;
+    font-weight: 900;
+    color: var(--text);
+  }
+
+  .od-gate-note {
+    font-size: 0.82rem;
+    color: var(--steel);
+    line-height: 1.6;
+    margin-bottom: 0.6rem;
+  }
+
+  .od-gate-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .od-gate-form .od-btn { margin-top: 0.5rem; }
+
+  /* ── Hero ────────────────────────────────────────────────────────────── */
+  .od-hero {
+    padding-block: 2.75rem 1.75rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .od-head {
+    font-family: var(--font-head);
+    font-size: clamp(2rem, 6vw, 3.2rem);
+    font-weight: 900;
+    line-height: 0.95;
+    color: var(--text);
+    margin-top: 0.35rem;
+  }
+
+  .od-sub {
+    font-size: 0.88rem;
+    color: var(--steel);
+    max-width: 560px;
+    line-height: 1.65;
+    margin-top: 0.7rem;
+  }
+
+  /* ── Viewer ──────────────────────────────────────────────────────────── */
+  .od-viewer-sec { padding-block: 1.5rem; }
+
+  .od-frame-wrap {
+    border: 1px solid var(--panel-edge);
+    background: #0c0d0f;
+    overflow: hidden;
+  }
+
+  .od-frame {
+    display: block;
+    width: 100%;
+    height: clamp(560px, 86vh, 1100px);
+    border: 0;
+  }
+
+  /* ── Checkout ────────────────────────────────────────────────────────── */
+  .od-checkout {
+    background: var(--panel);
+    border-top: 1px solid var(--panel-edge);
+    padding-block: 2.5rem 3.5rem;
+  }
+
+  .od-checkout-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 680px;
+  }
+
+  .od-checkout-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .od-checkout-note {
+    font-size: 0.8rem;
+    color: var(--steel);
+    line-height: 1.6;
+    margin-top: 0.3rem;
+  }
+
+  .od-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .od-hp {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .od-spec-peek {
+    border-top: 1px solid var(--panel-edge);
+    padding-top: 1rem;
+  }
+
+  .od-spec-peek summary {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--steel);
+    cursor: pointer;
+  }
+
+  .od-spec-peek summary:hover { color: var(--gold); }
+  .od-spec-peek summary:focus-visible { outline: 2px solid var(--copper); outline-offset: 3px; }
+
+  .od-spec {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    line-height: 1.6;
+    color: var(--steel);
+    background: var(--graphite);
+    border: 1px solid var(--panel-edge);
+    padding: 0.9rem;
+    margin-top: 0.8rem;
+    max-height: 320px;
+    overflow: auto;
+    white-space: pre-wrap;
+  }
+
+  @media (max-width: 600px) {
+    .field-row { grid-template-columns: 1fr; }
+    .od-frame { height: clamp(520px, 78vh, 900px); }
+  }
+</style>

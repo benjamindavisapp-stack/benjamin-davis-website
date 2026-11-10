@@ -8,12 +8,14 @@ interface Props {
   title: string;
   description?: string;
   ogImage?: string;
+  noindex?: boolean;
 }
 
 const {
   title,
   description = 'Benjamin Davis — Advanced Manufacturing researcher, ISEF 2025 Regeneron Young Scientist Award winner, and Masason Foundation member from Wrentham, MA.',
   ogImage = '/images/machine-full.jpg',
+  noindex = false,
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
@@ -26,6 +28,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <meta name="theme-color" content="#0b0c0e" />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
 
     <!-- Open Graph -->
     <meta property="og:type"        content="website" />
