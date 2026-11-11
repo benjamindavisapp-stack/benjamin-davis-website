@@ -48,12 +48,16 @@ import CncMill  from '@/components/CncMill.astro';
     </div>
   </section>
 
-  <!-- ── Three credential tiles ────────────────────────────────────────────── -->
+  <!-- ── Credentials ───────────────────────────────────────────────────────────
+       A spec sheet, not a card row: three equal icon-topped cards side by side
+       is the single most recognisable generated-landing-page shape, and these
+       three facts aren't parallel anyway — they want reading in order, with the
+       award weighted last. Rows also let the longest entry breathe instead of
+       forcing all three to the height of the tallest. -->
   <section class="credentials" aria-label="Key credentials">
-    <div class="container cred-grid">
+    <div class="container cred-sheet">
 
-      <article class="cred-tile">
-        <span class="cred-mark" aria-hidden="true">&#9670;</span>
+      <article class="cred-row">
         <h2 class="cred-title">Masason Foundation</h2>
         <p class="cred-body">
           Member of a highly selective global fellowship for exceptional young
@@ -61,8 +65,7 @@ import CncMill  from '@/components/CncMill.astro';
         </p>
       </article>
 
-      <article class="cred-tile">
-        <span class="cred-mark" aria-hidden="true">&#9670;</span>
+      <article class="cred-row">
         <h2 class="cred-title">Regeneron Young Scientist</h2>
         <p class="cred-body">
           One of two students worldwide to receive the ISEF 2025 Young Scientist
@@ -70,8 +73,7 @@ import CncMill  from '@/components/CncMill.astro';
         </p>
       </article>
 
-      <article class="cred-tile cred-tile--gold">
-        <span class="cred-mark cred-mark--gold" aria-hidden="true">&#9670;</span>
+      <article class="cred-row cred-row--gold">
         <h2 class="cred-title cred-title--gold">$75,000 Scholarship</h2>
         <p class="cred-body">
           Won at ISEF 2025, Columbus, OH — alongside 1st Place in Engineering
@@ -439,32 +441,25 @@ import CncMill  from '@/components/CncMill.astro';
     border-bottom: 1px solid var(--panel-edge);
   }
 
-  .cred-grid {
+  /* Stacked spec rows: label column, data column — the same construction as
+     the project spec table further down the page. */
+  .cred-sheet {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
     gap: 1px;
     background: var(--panel-edge);
   }
 
-  .cred-tile {
+  .cred-row {
     background: var(--panel);
-    padding: 2rem 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
+    padding: 1.4rem 1.5rem;
+    display: grid;
+    grid-template-columns: minmax(10rem, 15rem) 1fr;
+    gap: 0.4rem 2rem;
+    align-items: baseline;
   }
 
-  .cred-tile--gold {
+  .cred-row--gold {
     background: color-mix(in srgb, var(--gold-dim) 15%, var(--panel));
-  }
-
-  .cred-mark {
-    font-size: 0.48rem;
-    color: var(--copper);
-  }
-
-  .cred-mark--gold {
-    color: var(--gold);
   }
 
   .cred-title {
@@ -487,8 +482,9 @@ import CncMill  from '@/components/CncMill.astro';
   }
 
   @media (max-width: 600px) {
-    .cred-grid {
+    .cred-row {
       grid-template-columns: 1fr;
+      gap: 0.5rem;
     }
   }
 
@@ -619,9 +615,14 @@ import CncMill  from '@/components/CncMill.astro';
     border-bottom: 1px solid var(--panel-edge);
   }
 
+  /* Column count tracks the tiles actually rendered above. The Blog tile is
+     commented out while /blog is disabled, so this is 4, not 5 — a surplus
+     column isn't empty space, it paints the grid's own --panel-edge
+     background as a slab hanging off the end of the row. Restore to 5 in the
+     same change that restores the Blog tile. */
   .snt-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 1px;
     background: var(--panel-edge);
   }
@@ -704,8 +705,10 @@ import CncMill  from '@/components/CncMill.astro';
     border-bottom: 1px solid var(--panel-edge);
   }
 
+  /* No accent rule down the left edge — the panel against the page ground is
+     already enough separation, and the coloured left stripe is a tell. */
   .featured-quote {
-    border-left: 2px solid var(--gold-dim);
+    border: 1px solid var(--panel-edge);
     padding: 1.5rem 2rem;
     background: var(--panel);
     max-width: 680px;

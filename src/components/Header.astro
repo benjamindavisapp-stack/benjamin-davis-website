@@ -76,9 +76,11 @@ const { pathname } = Astro.url;
     top: 0;
     z-index: 100;
     height: var(--nav-height);
-    background: color-mix(in srgb, var(--graphite) 90%, transparent);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    /* Solid, not frosted. At 90% opacity the blur was doing almost nothing
+       visible anyway, while costing a compositor pass on every scroll frame —
+       a bad trade on the phones most visitors arrive on, and the glass look
+       is a tell besides. */
+    background: var(--graphite);
     border-bottom: 1px solid var(--panel-edge);
   }
 
