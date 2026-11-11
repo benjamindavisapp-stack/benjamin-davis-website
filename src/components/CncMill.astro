@@ -8,6 +8,16 @@
 <canvas class="cnc-stock" aria-hidden="true"></canvas>
 <canvas class="cnc-fx"    aria-hidden="true"></canvas>
 
+<noscript>
+  <style>
+    /* No script means no canvas to carry the name — show the real heading. */
+    .nameplate .np-name {
+      color: var(--gold);
+      -webkit-text-fill-color: var(--gold);
+    }
+  </style>
+</noscript>
+
 <style>
   .cnc-stock,
   .cnc-fx {
@@ -21,16 +31,28 @@
   .cnc-stock { z-index: 10; }
   .cnc-fx    { z-index: 11; }
 
-  /* Canvas provides the name visual — keep h1 in DOM for a11y/SEO only.
-     Tied to the static `.nameplate` class (present from first paint), not
-     a JS-added one — hiding that depended on JS running first left a real
-     window, between initial paint and script execution, where the plain
-     DOM heading could render before being hidden. Right as the canvas
-     then drew its own styled version, that read as the name appearing
-     twice. The tiny-screen fallback below explicitly un-hides this when
-     the canvas doesn't render at all. */
+  /* Canvas provides the name visual; the h1 stays for assistive tech and
+     crawlers. It is made transparent rather than `visibility: hidden` —
+     hidden would take the site's only h1 out of the accessibility tree and
+     out of the rendered text, which is the opposite of keeping it "for
+     a11y/SEO". Transparent keeps the heading exposed and keeps its layout
+     box, which matters twice over: the canvas derives its own height, and
+     so its baselines, from the box this heading reserves.
+
+     Tied to the static `.nameplate` class (present from first paint), not a
+     JS-added one — styling that depended on JS running first left a real
+     window, between initial paint and script execution, where the plain DOM
+     heading rendered before being styled. Right as the canvas then drew its
+     own version, that read as the name appearing twice. Both stacked
+     canvases sit above this heading anyway (z-index 10/11), so transparency
+     is the second line of defence, not the only one.
+
+     The tiny-screen fallback and the <noscript> block below both restore the
+     real text for the cases where the canvas never draws at all. */
   :global(.nameplate .np-name) {
-    visibility: hidden;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    user-select: none;
   }
 
   /* After animation: raise supporting content above the brass canvas (z-index:1) */
@@ -62,17 +84,19 @@
     const fxEl    = document.querySelector<HTMLCanvasElement>('.cnc-fx');
     if (!stockEl || !fxEl) return;
     const parent = stockEl.parentElement!;
-    // Belt-and-suspenders: the stylesheet rule above should already hide
-    // this from first paint with no JS dependency, but force it via inline
-    // style too, synchronously, as early as this script can possibly run.
-    // Inline style wins any cascade/specificity contest outright, so this
-    // guarantees the heading is hidden even if the stylesheet rule somehow
-    // isn't winning in some environment (a real report of a persistent
-    // second "BENJAMIN" — from the plain DOM heading sitting unhidden at
-    // its natural position — that this repo's own testing couldn't
-    // reproduce, so closing it this way rather than leaving it unresolved).
+    // Belt-and-suspenders: the stylesheet rule above should already make the
+    // heading transparent from first paint with no JS dependency, but force
+    // it via inline style too, synchronously, as early as this script can
+    // possibly run. Inline style wins any cascade/specificity contest
+    // outright, so this holds even if the stylesheet rule somehow isn't
+    // winning in some environment (a real report of a persistent second
+    // "BENJAMIN" — from the plain DOM heading sitting unstyled at its
+    // natural position — that this repo's own testing couldn't reproduce).
     const heading = parent.querySelector<HTMLElement>('.np-name');
-    if (heading) heading.style.visibility = 'hidden';
+    if (heading) {
+      heading.style.color = 'transparent';
+      heading.style.webkitTextFillColor = 'transparent';
+    }
     document.fonts.ready.then(() => setup(stockEl, fxEl, parent));
   }
 
@@ -82,8 +106,14 @@
     const W = Math.floor(rect.width);
     const H = Math.floor(rect.height);
     if (W < 100 || H < 60) {
+      // Canvas won't render at this size — hand the name back to the heading.
+      // Set the colour outright rather than clearing it: clearing only drops
+      // the inline value, leaving the stylesheet's transparent rule to win.
       const heading = parent.querySelector<HTMLElement>('.np-name');
-      if (heading) heading.style.visibility = 'visible'; // canvas won't render — show the real text
+      if (heading) {
+        heading.style.color = 'var(--gold)';
+        heading.style.webkitTextFillColor = 'var(--gold)';
+      }
       showDone(stockEl, fxEl, parent);
       return;
     }
@@ -857,14 +887,71 @@
     let curR     = R1;
     let curLoad  = 1;
     let lastTs: number | null = null;
+    let startTs: number | null = null;
+
+    /* ── Wall-clock feed override ───────────────────────────────────────────
+       The job is advanced by `dt`, so losing frame rate used to stretch the
+       sequence in real time rather than just dropping frames: with dt clamped
+       at 0.05s a device holding ~14fps advanced only 0.7s of cutting per
+       second of wall clock, and the whole job ran past a minute — on a phone
+       arriving from the card, that's an uncut billet where the name should
+       be. The tool now carries a feed override. Each frame it compares the
+       share of toolpath actually consumed against where the clock says it
+       should be, and scales dt to close the gap, so the job lands near
+       JOB_TIME on fast and slow hardware alike. stepAlong walks every
+       intermediate sub-segment, so a larger dt removes the same material in
+       fewer frames rather than skipping any of it, and its own 400-step guard
+       bounds the extra work a boosted frame can take on. */
+    const JOB_TIME     = 6;    // s — wall-clock target for the whole sequence
+    const TIME_CAP     = 8;    // s — hard deadline: finish the part outright
+    const MAX_DT       = 0.2;  // s — per-frame advance ceiling (GC, tab restore)
+    const MAX_OVERRIDE = 14;   // × — ceiling on the override multiplier
+
+    const totalPts = roughPath1.length + roughPath2.length + finOuterPath.length;
+
+    // Toolpath points consumed so far — the progress signal the override reads.
+    function consumedPts(): number {
+      switch (phase) {
+        case 'approach':  return 0;
+        case 'rough1':    return pathIdx;
+        case 'r2_rapid':  return roughPath1.length;
+        case 'rough2':    return roughPath1.length + pathIdx;
+        case 'fin_rapid': return roughPath1.length + roughPath2.length;
+        case 'finishing': return roughPath1.length + roughPath2.length + pathIdx;
+        default:          return totalPts;
+      }
+    }
+
+    // Cut whatever the tool never reached and present the finished part. Same
+    // end state as the reduced-motion path, reached from wherever we stopped.
+    function finishNow() {
+      animDone = true;
+      finalizeCutMask();
+      composite();
+      finalise();
+    }
 
     // Show initial brass immediately before rAF starts
     composite();
 
     function frame(ts: number) {
+      if (startTs === null) startTs = ts;
       if (!lastTs) lastTs = ts;
-      const dt = Math.min((ts - lastTs) / 1000, 0.05);
+      const wall = (ts - startTs) / 1000;
+
+      // Past the deadline the finished part matters more than the show.
+      if (wall > TIME_CAP) { finishNow(); return; }
+
+      let dt = Math.min((ts - lastTs) / 1000, MAX_DT);
       lastTs = ts;
+
+      // Feed override — pull the job back onto its wall-clock schedule.
+      if (totalPts > 0) {
+        const want = Math.min(1, wall / JOB_TIME);
+        const have = consumedPts() / totalPts;
+        if (have < want) dt *= Math.min(MAX_OVERRIDE, 1 + (want - have) * 12);
+      }
+
       animTime += dt;
 
       spinA += SPIN * dt;
