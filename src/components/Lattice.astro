@@ -29,7 +29,7 @@
 
 interface Props {
   /** 'mix' (default) · 'aluminium' · 'feedstock' (PET + PLA) · 'silicon' */
-  material?: 'mix' | 'aluminium' | 'feedstock' | 'silicon' | 'steel' | 'peek' | 'ptfe' | 'cellulose';
+  material?: 'mix' | 'aluminium' | 'feedstock' | 'silicon' | 'steel' | 'peek' | 'ptfe' | 'cellulose' | 'carbide';
 }
 const { material = 'mix' } = Astro.props;
 ---
@@ -313,6 +313,34 @@ const { material = 'mix' } = Astro.props;
     return nextLeft;
   }
 
+  /* ── Tungsten carbide: simple hexagonal ────────────────────────────────── */
+  // WC is hexagonal, not cubic, so it is the one cell here that is not a box —
+  // a prism rather than a cube. It is what the endmills, router bits and inserts
+  // are actually made of, which is why it sits on the equipment page.
+  function hexCell(ctx: CanvasRenderingContext2D, c: Pt, g: Geo) {
+    const r  = g.L * 1.05;
+    const ht = g.L * 1.5;
+    const sq = 0.42;                    // vertical squash, so it reads as a solid
+    const face = (dy: number) => {
+      const v: Pt[] = [];
+      for (let i = 0; i < 6; i++) {
+        const a = rad(i * 60 + 30);
+        v.push(pt(c.x + Math.cos(a) * r, c.y + dy + Math.sin(a) * r * sq));
+      }
+      return v;
+    };
+    const top = face(-ht / 2), bot = face(ht / 2);
+    for (let i = 0; i < 6; i++) {
+      bond(ctx, top[i], top[(i + 1) % 6]);
+      bond(ctx, bot[i], bot[(i + 1) % 6]);
+      bond(ctx, top[i], bot[i]);
+    }
+    const rr = Math.max(1, g.L * 0.1);
+    top.forEach(p => openRing(ctx, p, rr));
+    bot.forEach(p => openRing(ctx, p, rr));
+    openRing(ctx, c, rr);               // the interstitial carbon
+  }
+
   /* ── Silicon: diamond cubic ────────────────────────────────────────────── */
   // Same cube as the FCC cell, but with the tetrahedral interior that makes it
   // diamond cubic rather than close-packed — each atom bonded to four others at
@@ -418,6 +446,7 @@ const { material = 'mix' } = Astro.props;
         : material === 'steel'     ? 'bct'
         : material === 'peek'      ? 'peek'
         : material === 'ptfe'      ? 'ptfe'
+        : material === 'carbide'   ? 'wc'
         : material === 'cellulose' ? 'cel'
         // The extruder page is only what goes through the extruder: no metal,
         // and PLA alternating with PET rather than PA.
@@ -430,7 +459,7 @@ const { material = 'mix' } = Astro.props;
       ctx.translate(0, y);
       ctx.rotate(tilt);
 
-      if (kind === 'fcc' || kind === 'si' || kind === 'bct') {
+      if (kind === 'fcc' || kind === 'si' || kind === 'bct' || kind === 'wc') {
         // Against polymer, a unit cell carries far more strokes than a length
         // of chain, so evenly spaced cells read as a dense band rather than
         // punctuation — they sit about four cell widths apart. On a page that
@@ -438,8 +467,8 @@ const { material = 'mix' } = Astro.props;
         // read as bulk material. The per-row tilt and offset keep them off a
         // regular grid either way.
         // Close-packed metal sits tight; the open silicon lattice sits sparse.
-        const step = L * (kind === 'si' ? 8.5 : kind === 'bct' ? 4.2 : material === 'aluminium' ? 4.6 : 8);
-        const draw = kind === 'si' ? siliconCell : kind === 'bct' ? bctCell : cell;
+        const step = L * (kind === 'si' ? 8.5 : kind === 'bct' ? 4.2 : kind === 'wc' ? 5 : material === 'aluminium' ? 4.6 : 8);
+        const draw = kind === 'si' ? siliconCell : kind === 'bct' ? bctCell : kind === 'wc' ? hexCell : cell;
         for (let x = -step * (0.2 + hash(row) * 0.8); x < W / Math.cos(tilt) + step; x += step) {
           draw(ctx, pt(x, 0), g);
         }

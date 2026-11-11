@@ -15,7 +15,7 @@ const additive = [
       { key: 'Multi-material', val: 'AMS system' },
     ],
     notes:   'Primary printer for rapid prototyping, jigs, fixtures, and TechForge student projects. Secured via ISEF winnings for Bishop Feehan\'s fabrication lab.',
-    image:   '/images/printer-bambu.jpg',
+    image:   null,
     imageAlt: 'Bambu Lab H2C 3D printer in the fabrication lab',
   },
   {
@@ -127,7 +127,7 @@ const software = [
 
   <!-- ── Hero ───────────────────────────────────────────────────────────────── -->
   <section class="hero">
-    <Lattice />
+    <Lattice material="carbide" />
     <Bolt position="tl" />
     <Bolt position="tr" />
     <Bolt position="bl" />
@@ -164,9 +164,7 @@ const software = [
                   <img src={item.image} alt={item.imageAlt}
                     width="600" height="400" loading="lazy" />
                 </div>
-              : <figure class="img-placeholder" style="aspect-ratio:3/2;"
-                  data-label={`[Photo: ${item.imageAlt}]`} aria-hidden="true">
-                </figure>
+              : null
             }
             <div class="card-body">
               <p class="card-type">{item.type}</p>
@@ -205,9 +203,7 @@ const software = [
                   <img src={item.image} alt={item.imageAlt}
                     width="600" height="400" loading="lazy" />
                 </div>
-              : <figure class="img-placeholder" style="aspect-ratio:3/2;"
-                  data-label={`[Photo: ${item.imageAlt}]`} aria-hidden="true">
-                </figure>
+              : null
             }
             <div class="card-body">
               <p class="card-type">{item.type}</p>
@@ -243,9 +239,7 @@ const software = [
                   <img src={item.image} alt={item.imageAlt}
                     width="600" height="400" loading="lazy" />
                 </div>
-              : <figure class="img-placeholder" style="aspect-ratio:3/2;"
-                  data-label={`[Photo: ${item.imageAlt}]`} aria-hidden="true">
-                </figure>
+              : null
             }
             <div class="card-body">
               <p class="card-type">{item.type}</p>
@@ -280,9 +274,7 @@ const software = [
                 <img src={item.image} alt={item.imageAlt}
                   width="800" height="500" loading="lazy" />
               </div>
-            : <figure class="img-placeholder fc-image-placeholder"
-                data-label={`[Photo: ${item.imageAlt}]`} aria-hidden="true">
-              </figure>
+            : null
           }
           <div class="fc-body">
             <p class="card-type">{item.type}</p>
@@ -397,12 +389,12 @@ const software = [
   /* ── Equipment grid ───────────────────────────────────────────────────────── */
   .equip-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 1px;
     border: 1px solid var(--panel-edge);
   }
   .equip-grid--three {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   }
 
   /* ── Equipment card ───────────────────────────────────────────────────────── */
