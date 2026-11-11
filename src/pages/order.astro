@@ -118,6 +118,87 @@ const BLOB_URL = '/order/card-viewer.enc';
 
     const say = (el, text, bad) => { el.textContent = text; el.classList.toggle('od-msg--bad', !!bad); };
 
+    /* ── attempt throttling ─────────────────────────────────────────────────
+       A courtesy brake, not a security control, and worth being honest about:
+       this site is static, so there is no server here to enforce anything. The
+       counters live in localStorage, which anyone can clear, sidestep with a
+       private window, or ignore entirely by downloading the .enc blob and
+       attacking it offline. What actually protects the viewer is the
+       310,000-iteration PBKDF2 derivation and the length of the key.
+
+       What this does buy: it stops idle repeated guessing at the gate, and it
+       keeps a stuck finger or a loop from burning through the form quota and
+       filling the inbox with duplicate orders. */
+    const store = {
+      get(k, fallback) {
+        try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; }
+        catch (_) { return fallback; }
+      },
+      set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
+      del(k)    { try { localStorage.removeItem(k); } catch (_) {} },
+    };
+
+    const humanWait = (ms) => {
+      const s = Math.ceil(ms / 1000);
+      if (s < 60) return s + (s === 1 ? ' second' : ' seconds');
+      const m = Math.ceil(s / 60);
+      return m + (m === 1 ? ' minute' : ' minutes');
+    };
+
+    /* Gate: a few free tries, then a doubling wait up to a quarter of an hour. */
+    const GATE_KEY = 'bd-order-gate', GATE_FREE = 4, GATE_STEP = 15000, GATE_MAX = 900000;
+    const gateState = () => store.get(GATE_KEY, { fails: 0, until: 0 });
+    const gateWait  = () => Math.max(0, gateState().until - Date.now());
+    const gatePass  = () => store.del(GATE_KEY);
+    function gateFail() {
+      const s = gateState();
+      s.fails += 1;
+      if (s.fails > GATE_FREE) {
+        const n = s.fails - GATE_FREE;
+        s.until = Date.now() + Math.min(GATE_STEP * Math.pow(2, n - 1), GATE_MAX);
+      }
+      store.set(GATE_KEY, s);
+      return Math.max(0, s.until - Date.now());
+    }
+
+    /* Ticks the remaining wait down in the status line so it is visibly
+       counting rather than looking stuck, and re-enables the button itself. */
+    let gateTimer = 0;
+    function holdGate() {
+      clearInterval(gateTimer);
+      const btn = $('od-unlock'), input = $('od-pw');
+      const tick = () => {
+        const left = gateWait();
+        if (left <= 0) {
+          clearInterval(gateTimer);
+          btn.disabled = false; input.disabled = false;
+          say(gateMsg, 'You can try again now.');
+          return;
+        }
+        btn.disabled = true; input.disabled = true;
+        say(gateMsg, 'Too many attempts. Try again in ' + humanWait(left) + '.', true);
+      };
+      tick();
+      gateTimer = setInterval(tick, 1000);
+    }
+
+    /* Orders: a gap between sends, and a ceiling per hour. */
+    const SEND_KEY = 'bd-order-sends', SEND_GAP = 20000, SEND_MAX = 5, SEND_WIN = 3600000;
+    const sendLog = () => store.get(SEND_KEY, []).filter((t) => Date.now() - t < SEND_WIN);
+    function sendWait() {
+      const log = sendLog();
+      if (!log.length) return 0;
+      const since = Date.now() - log[log.length - 1];
+      if (since < SEND_GAP) return SEND_GAP - since;
+      if (log.length >= SEND_MAX) return SEND_WIN - (Date.now() - log[0]);
+      return 0;
+    }
+    function sendMark() {
+      const log = sendLog();
+      log.push(Date.now());
+      store.set(SEND_KEY, log);
+    }
+
     /* ── unlock ─────────────────────────────────────────────────────────── */
     async function decrypt(password) {
       const res = await fetch(BLOB_URL, { cache: 'no-store' });
@@ -160,10 +241,15 @@ const BLOB_URL = '/order/card-viewer.enc';
       return true;
     }
 
-    $('od-gate-form').addEventListener('submit', (e) => {
+    $('od-gate-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      unlock($('od-pw').value.trim(), false);
+      if (gateWait() > 0) { holdGate(); return; }
+      if (await unlock($('od-pw').value.trim(), false)) gatePass();
+      else if (gateFail() > 0) holdGate();
     });
+
+    /* A wait left over from a previous visit still applies on load. */
+    if (gateWait() > 0) holdGate();
 
     /* A sent link can carry the password: /order#k=... — a fragment never reaches
        a server and is dropped from the URL bar as soon as it is used. */
@@ -172,8 +258,12 @@ const BLOB_URL = '/order/card-viewer.enc';
       if (!m) return;
       const sent = decodeURIComponent(m[1]);
       history.replaceState(null, '', location.pathname + location.search);
-      if (await unlock(sent, true)) return;
-      say(gateMsg, 'That key does not open this page. Check it and try again.', true);
+      if (gateWait() > 0) { holdGate(); return; }
+      if (await unlock(sent, true)) { gatePass(); return; }
+      /* A bad key in a sent link counts the same as a typed one: otherwise the
+         link is a way around the brake. */
+      if (gateFail() > 0) holdGate();
+      else say(gateMsg, 'That key does not open this page. Check it and try again.', true);
     })();
 
     /* ── read the design out of the viewer ──────────────────────────────── */
@@ -206,6 +296,13 @@ const BLOB_URL = '/order/card-viewer.enc';
       e.preventDefault();
       if (form.elements.botcheck.checked) return;
 
+      const held = sendWait();
+      if (held > 0) {
+        say(formMsg, 'That order is already on its way. If something needs changing, wait '
+          + humanWait(held) + ' or email ' + ORDER_TO + '.', true);
+        return;
+      }
+
       const name = $('od-name').value.trim(), email = $('od-email').value.trim();
       if (!name || !email) { say(formMsg, 'Add your name and email first.', true); return; }
 
@@ -228,6 +325,7 @@ const BLOB_URL = '/order/card-viewer.enc';
         location.href = 'mailto:' + ORDER_TO
           + '?subject=' + encodeURIComponent('Card order — ' + name)
           + '&body=' + encodeURIComponent(body);
+        sendMark();
         btn.disabled = false;
         say(formMsg, 'Your mail app is opening with the whole order filled in — press send to place it.');
         return;
@@ -251,6 +349,9 @@ const BLOB_URL = '/order/card-viewer.enc';
         });
         const out = await res.json().catch(() => ({}));
         if (!res.ok || out.success === false) throw new Error(out.message || 'send failed');
+        /* Only a send that actually landed counts against the ceiling — a
+           failed one should not lock the customer out of retrying. */
+        sendMark();
         form.reset();
         say(formMsg, 'Order placed. A quote will come back to ' + email + '.');
       } catch (err) {
