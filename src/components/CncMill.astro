@@ -367,7 +367,7 @@
     const fieldOff = mkCanvas(PW, PH);
     const fiCtx    = fieldOff.getContext('2d')!;
     fiCtx.scale(DPR, DPR);
-    renderField(fiCtx, W, H, R1, R1, inkDist);
+    renderField(fiCtx, W, H, R1, R1, inkDist, DPR);
 
     /* ── Pre-render: finer field texture left by the semi-finish pass ─────── */
     // Same model, smaller tool + tighter stepover (R2) — a real, visibly
@@ -375,7 +375,7 @@
     const fieldOff2 = mkCanvas(PW, PH);
     const fiCtx2    = fieldOff2.getContext('2d')!;
     fiCtx2.scale(DPR, DPR);
-    renderField(fiCtx2, W, H, R2, R2, inkDist);
+    renderField(fiCtx2, W, H, R2, R2, inkDist, DPR);
 
     /* ── Pre-render: drop shadow shape ───────────────────────────────────── */
     // Dark fill masked to offset-text shape, minus the letter body itself
@@ -1134,7 +1134,7 @@
   // moved. `ringPitch` matches the real stepover for this pass; amplitude
   // approximates the witness-mark height a round tool of radius `toolR`
   // leaves at that stepover (chord-height of the uncut cusp between two
-  // adjacent rings) — a small tool on a tight stepover genuinely leaves a
+  // adjacent rings) — a small tool on a tight stepover leaves a
   // finer, shallower pattern than a big roughing tool on a wide stepover.
   function hashRing(n: number): number {
     const s = Math.sin(n * 12.9898) * 43758.5453;
@@ -1143,7 +1143,7 @@
 
   function renderField(
     ctx: CanvasRenderingContext2D, W: number, H: number,
-    toolR: number, stepover: number, distField: Float32Array
+    toolR: number, stepover: number, distField: Float32Array, dpr: number
   ) {
     const ringPitch = Math.max(2, stepover);
     const half       = Math.min(ringPitch / 2, toolR);
@@ -1155,12 +1155,23 @@
     ctx.fillStyle = '#8a6914';
     ctx.fillRect(0, 0, W, H);
 
-    const img  = ctx.getImageData(0, 0, W, H);
+    // getImageData/putImageData ignore the context transform and address raw
+    // device pixels, so this walks the full device-resolution buffer and maps
+    // each device pixel back to sample the CSS-space distance field. Passing
+    // CSS W/H here instead processed only the top-left corner of the buffer
+    // while reading the distance field at device coordinates, which painted a
+    // second, 1/dpr-scale copy of the letter contours into that corner — the
+    // "second BENJAMIN" this file's comments had previously failed to pin down.
+    const PW = Math.max(1, Math.round(W * dpr));
+    const PH = Math.max(1, Math.round(H * dpr));
+    const img  = ctx.getImageData(0, 0, PW, PH);
     const data = img.data;
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const i = y * W + x;
-        const d = distField[i];
+    for (let y = 0; y < PH; y++) {
+      const sy = Math.min(H - 1, Math.floor(y / dpr));
+      for (let x = 0; x < PW; x++) {
+        const sx = Math.min(W - 1, Math.floor(x / dpr));
+        const i = y * PW + x;
+        const d = distField[sy * W + sx];
         const ring = Math.floor(d / ringPitch);
         const bandPos = d - ring * ringPitch;
         const edge = Math.min(bandPos, ringPitch - bandPos); // distance to nearest ring line
