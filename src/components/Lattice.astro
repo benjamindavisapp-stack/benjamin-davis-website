@@ -1,123 +1,181 @@
 ---
-// Generative strut-lattice background.
-// Animated when JS is available; static single-draw when prefers-reduced-motion.
+// Background: polyethylene terephthalate drawn as a skeletal formula.
+//
+// This replaced a triangulated node-graph with a dot at every vertex — the
+// "connected dots" network background, which is both a generated-page cliché
+// and a dot grid. PET is the polymer the extrusion research actually recycles,
+// so the background now draws the thing the site is about: para-substituted
+// benzene rings joined by ester linkages, -[O-CH2-CH2-O-CO-C6H4-CO]-, in the
+// standard skeletal convention where vertices are carbons and bonds stop short
+// of a heteroatom label.
+//
+// Drawn once, not per frame. The old version repainted several hundred edges
+// every rAF tick behind every hero, competing with the nameplate canvas for the
+// main thread; a molecule has no reason to drift anyway.
+//
 // Caller must give the parent element position:relative and overflow:hidden.
 ---
 
 <canvas class="lattice" aria-hidden="true"></canvas>
 
 <script>
-  const SPACING    = 64;   // grid cell size (px)
-  const DRIFT_R    = 3.5;  // max drift radius from home position
-  const DRIFT_SPD  = 0.005; // radians per frame
-  const STROKE     = 'rgba(35, 38, 44, 0.95)'; // --panel-edge
-  const DOT        = 'rgba(35, 38, 44, 0.70)';
+  const L       = 26;                           // bond length (px)
+  const STROKE  = 'rgba(35, 38, 44, 0.95)';     // --panel-edge
+  const LABEL   = 'rgba(48, 52, 60, 0.95)';     // heteroatom labels, a touch brighter
+  const INNER   = 4.2;                          // aromatic inner-line offset
+  const LABEL_R = 6.5;                          // bond trim around an atom label
 
-  type Node = { hx: number; hy: number; x: number; y: number; a: number };
+  interface Pt { x: number; y: number }
 
-  function buildLattice(W: number, H: number) {
-    const cols = Math.ceil(W / SPACING) + 2;
-    const rows = Math.ceil(H / (SPACING * 0.86)) + 2;
-    const nodes: Node[] = [];
-    const edges: [number, number][] = [];
-    const idx = (c: number, r: number) => r * (cols + 1) + c;
+  const pt = (x: number, y: number): Pt => ({ x, y });
+  const rad = (deg: number) => (deg * Math.PI) / 180;
 
-    for (let r = 0; r <= rows; r++) {
-      for (let c = 0; c <= cols; c++) {
-        const hexOff = (r % 2) * (SPACING * 0.5);
-        nodes.push({
-          hx: c * SPACING + hexOff - SPACING,
-          hy: r * SPACING * 0.86  - SPACING,
-          x: 0, y: 0,
-          a: Math.random() * Math.PI * 2,
-        });
-      }
-    }
-
-    // Triangulate: right, down, both diagonals
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c <= cols; c++) {
-        const i = idx(c, r);
-        if (c < cols) edges.push([i, idx(c + 1, r)]);
-        edges.push([i, idx(c, r + 1)]);
-        if (c < cols) edges.push([i, idx(c + 1, r + 1)]);
-        if (c > 0)    edges.push([i, idx(c - 1, r + 1)]);
-      }
-    }
-
-    return { nodes, edges };
+  // Deterministic per-row jitter so the pattern isn't a rigid grid but also
+  // doesn't reshuffle on every resize.
+  function hash(n: number): number {
+    const s = Math.sin(n * 127.1) * 43758.5453;
+    return s - Math.floor(s);
   }
 
-  function seedPositions(nodes: Node[]) {
-    for (const n of nodes) {
-      n.x = n.hx + Math.cos(n.a) * DRIFT_R;
-      n.y = n.hy + Math.sin(n.a) * DRIFT_R;
-    }
+  /* ── Primitives ────────────────────────────────────────────────────────── */
+
+  // Draws a-to-b, optionally trimmed at either end to clear an atom label.
+  function bond(ctx: CanvasRenderingContext2D, a: Pt, b: Pt, trimA = 0, trimB = 0) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d  = Math.hypot(dx, dy) || 1;
+    const ux = dx / d, uy = dy / d;
+    ctx.beginPath();
+    ctx.moveTo(a.x + ux * trimA, a.y + uy * trimA);
+    ctx.lineTo(b.x - ux * trimB, b.y - uy * trimB);
+    ctx.stroke();
   }
 
-  function render(
-    ctx: CanvasRenderingContext2D,
-    W: number, H: number,
-    nodes: Node[],
-    edges: [number, number][],
-  ) {
+  // Second line of a double bond, offset to one side and inset at both ends.
+  function innerLine(ctx: CanvasRenderingContext2D, a: Pt, b: Pt, off: number, inset = 0.18) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d  = Math.hypot(dx, dy) || 1;
+    const ux = dx / d, uy = dy / d;
+    const nx = -uy * off, ny = ux * off;
+    ctx.beginPath();
+    ctx.moveTo(a.x + ux * d * inset + nx, a.y + uy * d * inset + ny);
+    ctx.lineTo(b.x - ux * d * inset + nx, b.y - uy * d * inset + ny);
+    ctx.stroke();
+  }
+
+  function atom(ctx: CanvasRenderingContext2D, p: Pt, text: string) {
+    ctx.fillStyle = LABEL;
+    ctx.fillText(text, p.x, p.y);
+    ctx.fillStyle = STROKE;
+  }
+
+  /* ── Benzene ───────────────────────────────────────────────────────────── */
+  // Pointy-left/right orientation, so the 1 and 4 vertices sit on the
+  // horizontal axis — the para substitution PET's terephthalate unit has.
+  function ring(ctx: CanvasRenderingContext2D, centre: Pt) {
+    const v: Pt[] = [];
+    for (let i = 0; i < 6; i++) {
+      v.push(pt(centre.x + Math.cos(rad(i * 60)) * L,
+                centre.y + Math.sin(rad(i * 60)) * L));
+    }
+    for (let i = 0; i < 6; i++) bond(ctx, v[i], v[(i + 1) % 6]);
+    // Kekulé: inner lines on alternating edges, offset toward the centre.
+    for (let i = 0; i < 6; i += 2) innerLine(ctx, v[i], v[(i + 1) % 6], -INNER);
+    return { left: v[3], right: v[0] };
+  }
+
+  /* ── One PET repeat unit ───────────────────────────────────────────────── */
+  // Returns the attachment point the next unit continues from.
+  //
+  // Seven bonds join one ring to the next: C(=O)-O-CH2-CH2-O-C(=O). An odd
+  // bond count means a strict zig-zag ends half a step off the line it started
+  // on, so alternate units mirror their starting direction and the chain stays
+  // level over each pair rather than marching off the bottom of the screen.
+  function unit(ctx: CanvasRenderingContext2D, start: Pt, mirror: boolean): Pt {
+    const sign = mirror ? 1 : -1;
+    let p = start;
+
+    // Atom i is the point reached after bond i-1, so index 0 is the ring
+    // carbon we start from: A1 and A6 are the carbonyl carbons, A2 and A5 the
+    // ester oxygens, A3 and A4 the glycol CH2s (carbons, so unlabelled).
+    const marks: Record<number, string> = { 2: 'O', 5: 'O' };
+    const carbonylAfterBond = new Set([0, 5]);
+
+    for (let i = 0; i < 7; i++) {
+      const a = rad(sign * 30 * (i % 2 === 0 ? 1 : -1));
+      const next = pt(p.x + Math.cos(a) * L, p.y + Math.sin(a) * L);
+
+      bond(ctx, p, next, marks[i] ? LABEL_R : 0, marks[i + 1] ? LABEL_R : 0);
+
+      // Carbonyl: C=O perpendicular to the chain, alternating side per group
+      // so the two esters on a ring don't both point the same way.
+      if (carbonylAfterBond.has(i)) {
+        const dir = i === 0 ? -1 : 1;
+        const o   = pt(next.x, next.y + dir * L);
+        bond(ctx, next, o, 0, LABEL_R);
+        innerLine(ctx, next, o, 3.4, 0.22);
+        atom(ctx, pt(o.x, o.y + dir * 1.5), 'O');
+      }
+
+      if (marks[i + 1]) atom(ctx, next, 'O');
+      p = next;
+    }
+    return p;
+  }
+
+  /* ── Scene ─────────────────────────────────────────────────────────────── */
+
+  function render(ctx: CanvasRenderingContext2D, W: number, H: number) {
     ctx.clearRect(0, 0, W, H);
-    ctx.lineWidth = 0.7;
+    ctx.lineWidth   = 0.8;
+    ctx.lineCap     = 'round';
     ctx.strokeStyle = STROKE;
-    ctx.fillStyle   = DOT;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${Math.round(L * 0.44)}px 'IBM Plex Mono', ui-monospace, monospace`;
 
-    for (const [ai, bi] of edges) {
-      const a = nodes[ai], b = nodes[bi];
-      if (!a || !b) continue;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-    }
+    const ringSpan  = 2 * L;
+    const chainSpan = 7 * L * Math.cos(rad(30));
+    const repeat    = ringSpan + chainSpan;
+    const rowGap    = L * 3.6;
 
-    for (const n of nodes) {
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, 1.5, 0, Math.PI * 2);
-      ctx.fill();
+    for (let row = -1, y = -rowGap; y < H + rowGap; row++, y += rowGap) {
+      // Stagger each row by its own fraction of a repeat, so rings never line
+      // up into columns.
+      const x0 = -repeat * (0.15 + hash(row) * 0.9);
+      let p = pt(x0, y);
+      let k = 0;
+
+      while (p.x < W + repeat) {
+        const c = pt(p.x + L, p.y);
+        const { right } = ring(ctx, c);
+        p = unit(ctx, right, k % 2 === 1);
+        k++;
+      }
     }
   }
 
   document.querySelectorAll<HTMLCanvasElement>('canvas.lattice').forEach(canvas => {
     const ctx = canvas.getContext('2d')!;
-    let raf = 0;
-    let nodes: Node[] = [];
-    let edges: [number, number][] = [];
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    function init() {
-      canvas.width  = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-      ({ nodes, edges } = buildLattice(canvas.width, canvas.height));
-      seedPositions(nodes);
+    function draw() {
+      const w = canvas.offsetWidth, h = canvas.offsetHeight;
+      if (w < 2 || h < 2) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width  = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      render(ctx, w, h);
     }
 
-    function tick() {
-      for (const n of nodes) {
-        n.a += DRIFT_SPD;
-        n.x = n.hx + Math.cos(n.a) * DRIFT_R;
-        n.y = n.hy + Math.sin(n.a) * DRIFT_R;
-      }
-      render(ctx, canvas.width, canvas.height, nodes, edges);
-      raf = requestAnimationFrame(tick);
-    }
+    // Static, so a resize is the only reason to repaint. Coalesced to a frame
+    // so a drag-resize doesn't redraw per pixel.
+    let pending = 0;
+    new ResizeObserver(() => {
+      cancelAnimationFrame(pending);
+      pending = requestAnimationFrame(draw);
+    }).observe(canvas);
 
-    function start() {
-      init();
-      cancelAnimationFrame(raf);
-      if (reduced) {
-        render(ctx, canvas.width, canvas.height, nodes, edges);
-      } else {
-        tick();
-      }
-    }
-
-    new ResizeObserver(() => { cancelAnimationFrame(raf); start(); }).observe(canvas);
-    start();
+    draw();
   });
 </script>
 
