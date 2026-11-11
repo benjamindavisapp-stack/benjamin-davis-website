@@ -29,7 +29,7 @@
 
 interface Props {
   /** 'mix' (default) · 'aluminium' · 'feedstock' (PET + PLA) · 'silicon' */
-  material?: 'mix' | 'aluminium' | 'feedstock' | 'silicon';
+  material?: 'mix' | 'aluminium' | 'feedstock' | 'silicon' | 'steel' | 'peek';
 }
 const { material = 'mix' } = Astro.props;
 ---
@@ -203,6 +203,63 @@ const { material = 'mix' } = Astro.props;
     return s + d;
   }
 
+  /* ── Martensite: body-centred tetragonal ───────────────────────────────── */
+  // Quenched steel. Carbon trapped in the iron lattice on cooling stretches one
+  // axis, so the cell is taller than it is wide — that stretch is what makes
+  // the steel hard, and it is the whole visual difference from the cubic cells:
+  // one atom at the body centre, no face centres, no tetrahedral interior.
+  function bctCell(ctx: CanvasRenderingContext2D, c: Pt, g: Geo) {
+    const a  = g.L * 1.15;
+    const ht = g.L * 1.95;
+    const d  = a * 0.44;
+    const front = [pt(c.x - a / 2, c.y - ht / 2), pt(c.x + a / 2, c.y - ht / 2),
+                   pt(c.x + a / 2, c.y + ht / 2), pt(c.x - a / 2, c.y + ht / 2)];
+    const back  = front.map(p => pt(p.x + d, p.y - d));
+
+    for (let i = 0; i < 4; i++) {
+      bond(ctx, front[i], front[(i + 1) % 4]);
+      bond(ctx, back[i],  back[(i + 1) % 4]);
+      bond(ctx, front[i], back[i]);
+    }
+
+    const mid = pt(c.x + d / 2, c.y - d / 2);
+    for (let i = 0; i < 4; i++) bond(ctx, mid, front[i]);
+    const r = Math.max(1, g.L * 0.1);
+    front.forEach(p => openRing(ctx, p, r));
+    back.forEach(p => openRing(ctx, p, r));
+    openRing(ctx, mid, r);
+  }
+
+  /* ── PEEK repeat ───────────────────────────────────────────────────────── */
+  // -[O-C6H4-O-C6H4-CO-C6H4]-. Three aromatic rings per repeat against PET's
+  // one, joined by two ethers and a ketone, so the backbone is almost all ring.
+  // That density is what makes it read apart from every other chain here.
+  // Contract matches petUnit: given the right vertex of the ring the caller just
+  // drew, draw the rest of the repeat and return the left vertex of the ring the
+  // caller should draw next. Returning a ring's own right vertex instead left
+  // the closing bracket sitting inside a ring and the repeats touching with no
+  // linker between them.
+  function peekUnit(ctx: CanvasRenderingContext2D, start: Pt, mirror: boolean, g: Geo): Pt {
+    const sign = mirror ? 1 : -1;
+    let p = start;
+    let nextLeft = start;
+    for (let i = 0; i < 3; i++) {
+      const up = i % 2 === 0;
+      const link = pt(p.x + Math.cos(rad(sign * 30 * (up ? 1 : -1))) * g.L,
+                      p.y + Math.sin(rad(sign * 30 * (up ? 1 : -1))) * g.L);
+      const ketone = i === 2;
+      bond(ctx, p, link, 0, ketone ? 0 : g.labelR);
+      if (ketone) carbonyl(ctx, link, -1, g);
+      else atom(ctx, link, 'O');
+
+      nextLeft = pt(link.x + Math.cos(rad(-sign * 30 * (up ? 1 : -1))) * g.L,
+                    link.y + Math.sin(rad(-sign * 30 * (up ? 1 : -1))) * g.L);
+      bond(ctx, link, nextLeft, ketone ? 0 : g.labelR, 0);
+      if (i < 2) p = ring(ctx, pt(nextLeft.x + g.L, nextLeft.y), g).right;
+    }
+    return nextLeft;
+  }
+
   /* ── Silicon: diamond cubic ────────────────────────────────────────────── */
   // Same cube as the FCC cell, but with the tetrahedral interior that makes it
   // diamond cubic rather than close-packed — each atom bonded to four others at
@@ -286,6 +343,7 @@ const { material = 'mix' } = Astro.props;
     const petSpan = 2 * L + 7 * L * COS30;
     const paSpan  = 7 * L * COS30;
     const plaSpan = 3 * L * COS30;
+    const peekSpan = 3 * (2 * L + 2 * L * COS30);
     // Silicon's cell is larger, so its rows need more room between them than
     // the chains or the tighter metal cell do.
     const gap     = L * (material === 'silicon' ? 5 : 3.6);
@@ -302,6 +360,8 @@ const { material = 'mix' } = Astro.props;
       const kind  =
           material === 'aluminium' ? 'fcc'
         : material === 'silicon'   ? 'si'
+        : material === 'steel'     ? 'bct'
+        : material === 'peek'      ? 'peek'
         // The extruder page is only what goes through the extruder: no metal,
         // and PLA alternating with PET rather than PA.
         : material === 'feedstock' ? (hash(row * 4.3 + 7) < 0.5 ? 'pet' : 'pla')
@@ -313,7 +373,7 @@ const { material = 'mix' } = Astro.props;
       ctx.translate(0, y);
       ctx.rotate(tilt);
 
-      if (kind === 'fcc' || kind === 'si') {
+      if (kind === 'fcc' || kind === 'si' || kind === 'bct') {
         // Against polymer, a unit cell carries far more strokes than a length
         // of chain, so evenly spaced cells read as a dense band rather than
         // punctuation — they sit about four cell widths apart. On a page that
@@ -321,8 +381,8 @@ const { material = 'mix' } = Astro.props;
         // read as bulk material. The per-row tilt and offset keep them off a
         // regular grid either way.
         // Close-packed metal sits tight; the open silicon lattice sits sparse.
-        const step = L * (kind === 'si' ? 8.5 : material === 'aluminium' ? 4.6 : 8);
-        const draw = kind === 'si' ? siliconCell : cell;
+        const step = L * (kind === 'si' ? 8.5 : kind === 'bct' ? 4.2 : material === 'aluminium' ? 4.6 : 8);
+        const draw = kind === 'si' ? siliconCell : kind === 'bct' ? bctCell : cell;
         for (let x = -step * (0.2 + hash(row) * 0.8); x < W / Math.cos(tilt) + step; x += step) {
           draw(ctx, pt(x, 0), g);
         }
@@ -332,11 +392,13 @@ const { material = 'mix' } = Astro.props;
         // horizontal line — so the aromatic one is drawn coarse and the
         // short-repeat one fine, which is also roughly what their repeat
         // lengths are.
-        const scale = kind === 'pet' ? 1.15 : kind === 'pla' ? 0.7 : 1;
+        const scale = kind === 'pet' ? 1.15 : kind === 'pla' ? 0.7 : kind === 'peek' ? 0.92 : 1;
         const gl: Geo = { L: L * scale, inner: g.inner * scale, labelR: g.labelR * scale };
         const span   = W / Math.cos(tilt) + petSpan * 2;
-        const unit   = kind === 'pet' ? petUnit : kind === 'pla' ? plaUnit : paUnit;
-        const stride = (kind === 'pet' ? petSpan : kind === 'pla' ? plaSpan : paSpan) * scale;
+        const unit   = kind === 'pet' ? petUnit : kind === 'pla' ? plaUnit
+                     : kind === 'peek' ? peekUnit : paUnit;
+        const stride = (kind === 'pet' ? petSpan : kind === 'pla' ? plaSpan
+                      : kind === 'peek' ? peekSpan : paSpan) * scale;
         const marked = 1 + Math.floor(hash(row * 5.3 + 2) * 2);
 
         const strand = (yOff: number, flip: boolean, bracket: boolean) => {
@@ -344,7 +406,9 @@ const { material = 'mix' } = Astro.props;
           let k = 0;
           while (p.x < span) {
             const start = p;
-            if (kind === 'pet') {
+            // Both ring-backbone polymers start a repeat at a ring's right
+            // vertex, so the ring is drawn before the linkers that follow it.
+            if (kind === 'pet' || kind === 'peek') {
               const { right } = ring(ctx, pt(p.x + gl.L, p.y), gl);
               p = unit(ctx, right, flip !== (k % 2 === 1), gl);
             } else {
