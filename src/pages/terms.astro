@@ -1,0 +1,123 @@
+---
+import LegalLayout from '@/layouts/LegalLayout.astro';
+
+const CONTACT = 'benjamindavisma@gmail.com';
+---
+
+<LegalLayout
+  title="Terms & Conditions — Benjamin Davis"
+  description="Terms of use for benjamindavis.build, including content ownership, the safety disclaimer on project documentation, and card orders."
+  heading="Terms &amp; Conditions"
+  updated="11 November 2026"
+>
+
+  <p>
+    This site is a personal portfolio documenting the research, engineering
+    projects, and awards of Benjamin Davis. Using it means accepting the terms
+    below.
+  </p>
+
+  <h2>Ownership of content</h2>
+
+  <p>
+    The text, photographs, diagrams, project documentation, and code on this
+    site are the work of Benjamin Davis and remain his property. You are welcome
+    to read, link to, quote briefly with attribution, and share the pages as they
+    are.
+  </p>
+
+  <p>
+    Republishing substantial portions, using the photographs or project
+    documentation commercially, or presenting any of this work as your own
+    requires written permission first. Requests are usually granted — just ask.
+  </p>
+
+  <h2>Accuracy</h2>
+
+  <p>
+    Awards, measurements, and project results described here are reported
+    accurately to the best of Benjamin's knowledge at the time of writing.
+    Research figures come from his own testing and are not independently
+    verified or peer-reviewed unless a page explicitly says otherwise. Pages are
+    not guaranteed to stay current.
+  </p>
+
+  <h2>Project documentation is not build instructions</h2>
+
+  <div class="legal-note">
+    Please read this section if you intend to replicate anything shown here.
+  </div>
+
+  <p>
+    This site documents machinery and experiments that are genuinely dangerous
+    to reproduce: plastic extrusion at high temperature, machining, compressed
+    gas, high-voltage electronics, and powered mechanical systems. The write-ups
+    exist to explain what was built and what was learned. They are descriptions
+    of past work, not instructions, plans, or a safety curriculum, and they
+    deliberately omit detail that would be needed to build safely.
+  </p>
+
+  <p>
+    If you choose to attempt similar work, you do so entirely at your own risk
+    and are responsible for your own training, equipment, protective measures,
+    and compliance with the law where you live. Benjamin Davis accepts no
+    liability for any injury, damage, or loss arising from anyone acting on
+    information found here.
+  </p>
+
+  <h2>No warranty</h2>
+
+  <p>
+    The site is provided as-is. No promise is made that it will be available,
+    uninterrupted, or free of errors, and it may change or be taken down at any
+    time without notice.
+  </p>
+
+  <h2>Links to other sites</h2>
+
+  <p>
+    External links are provided for reference. Their content is not controlled
+    or endorsed here, and this site is not responsible for what you find there.
+  </p>
+
+  <h2>Business cards</h2>
+
+  <p>
+    The card-order page is not a shop. It takes no payment, stores no card
+    details, and processes no transaction — it assembles an email so an order
+    can be arranged directly. Price, specification, lead time, and delivery are
+    agreed by email before anything is made, and nothing is binding until that
+    exchange is complete.
+  </p>
+
+  <h2>Contacting Benjamin</h2>
+
+  <p>
+    Messages sent through the site or to the address below are welcome, but no
+    particular response time is promised. Please don't send confidential
+    information by email.
+  </p>
+
+  <h2>Changes to these terms</h2>
+
+  <p>
+    These terms may be updated; the date at the top of the page reflects the
+    current version. Continuing to use the site after a change means accepting
+    the revised terms.
+  </p>
+
+  <h2>Governing law</h2>
+
+  <p>
+    These terms are governed by the laws of the Commonwealth of Massachusetts,
+    United States.
+  </p>
+
+  <h2>Contact</h2>
+
+  <p>
+    Questions about these terms, or permission requests, can go to
+    <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
+  </p>
+
+</LegalLayout>

@@ -19,6 +19,10 @@ const year = new Date().getFullYear();
     <span class="muted">&copy; {year} Benjamin Davis. All rights reserved.</span>
     <span class="footer-divider" aria-hidden="true">·</span>
     <span class="muted">Bishop Feehan High School, Class of 2027</span>
+    <span class="footer-divider" aria-hidden="true">·</span>
+    <a class="footer-legal" href="/privacy">Privacy</a>
+    <span class="footer-divider" aria-hidden="true">·</span>
+    <a class="footer-legal" href="/terms">Terms</a>
   </div>
 </footer>
 
@@ -83,4 +87,12 @@ const year = new Date().getFullYear();
   }
 
   .footer-divider { color: var(--panel-edge); }
+
+  /* Matches the muted footer text rather than the gold link colour — these
+     sit alongside the copyright line, not among the primary links. */
+  .footer-legal {
+    color: var(--steel);
+    transition: color 0.15s;
+  }
+  .footer-legal:hover { color: var(--text); }
 </style>

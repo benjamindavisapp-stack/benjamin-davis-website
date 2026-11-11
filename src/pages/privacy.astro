@@ -1,0 +1,113 @@
+---
+import LegalLayout from '@/layouts/LegalLayout.astro';
+
+const CONTACT = 'benjamindavisma@gmail.com';
+---
+
+<LegalLayout
+  title="Privacy Policy — Benjamin Davis"
+  description="What benjamindavis.build does and does not collect. No cookies, no analytics, no tracking."
+  heading="Privacy Policy"
+  updated="11 November 2026"
+>
+
+  <p>
+    This site is a personal portfolio run by Benjamin Davis. It is deliberately
+    built to collect as close to nothing as a website can. There are no
+    accounts, no cookies set by this site, no analytics, and no advertising or
+    tracking scripts of any kind.
+  </p>
+
+  <h2>What this site collects</h2>
+
+  <p>
+    Nothing. The site is a set of static pages. It has no database, no login,
+    and no server-side code that receives anything you type.
+  </p>
+
+  <h2>The contact and order forms</h2>
+
+  <p>
+    The forms on the <a href="/contact">contact</a> and card-order pages do not
+    submit anything to this site. When you press send, the form assembles what
+    you typed into a message and hands it to whatever email program your device
+    uses. Nothing leaves your device until you send that email yourself, from
+    your own address, and you can edit or discard it first.
+  </p>
+
+  <p>
+    Once you do send it, the message sits in an ordinary Gmail inbox, subject to
+    Google's own privacy terms. It is used to reply to you and nothing else — it
+    is never sold, shared, or added to a mailing list.
+  </p>
+
+  <h2>What other companies see</h2>
+
+  <p>
+    Serving a page at all means some third parties necessarily see a request
+    from you. Specifically:
+  </p>
+
+  <ul>
+    <li>
+      <strong>Google Fonts.</strong> Typefaces are loaded from
+      <span>fonts.googleapis.com</span> and <span>fonts.gstatic.com</span>, so
+      Google receives your IP address and browser user-agent when a page loads.
+    </li>
+    <li>
+      <strong>Vercel.</strong> The site is hosted on Vercel, which keeps
+      standard server logs of requests, including IP addresses.
+    </li>
+    <li>
+      <strong>Cloudflare.</strong> Cloudflare sits in front of the site for DNS,
+      caching, and bot protection. It inspects requests and may set its own
+      security cookies to tell real visitors from automated traffic.
+    </li>
+  </ul>
+
+  <p>
+    None of these are chosen to gather information about you, and none of their
+    data is accessible to or used by this site beyond the fact that pages get
+    served.
+  </p>
+
+  <h2>Links to other sites</h2>
+
+  <p>
+    Pages here link out to places like LinkedIn and fair or award organisations.
+    Once you follow a link you are on someone else's site under someone else's
+    privacy policy, and this one no longer applies.
+  </p>
+
+  <h2>Children</h2>
+
+  <p>
+    This site is not directed at children under 13 and knowingly collects no
+    information from anyone, children included.
+  </p>
+
+  <h2>Your rights</h2>
+
+  <p>
+    Because nothing is collected, there is generally nothing to request, correct,
+    or delete. The exception is an email you chose to send: write to
+    <a href={`mailto:${CONTACT}`}>{CONTACT}</a> and it will be deleted on
+    request.
+  </p>
+
+  <h2>Changes</h2>
+
+  <p>
+    If this policy changes, the date at the top of the page changes with it.
+    There is no archive of previous versions — the current text is the whole
+    policy.
+  </p>
+
+  <h2>Contact</h2>
+
+  <p>
+    Questions about this policy can go to
+    <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
+  </p>
+
+</LegalLayout>
