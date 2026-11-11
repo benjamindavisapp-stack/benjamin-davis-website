@@ -327,32 +327,62 @@ const { material = 'mix' } = Astro.props;
           draw(ctx, pt(x, 0), g);
         }
       } else {
+        // Each polymer gets its own scale. Chemistry alone was not enough to
+        // tell them apart at background contrast — every chain read as the same
+        // horizontal line — so the aromatic one is drawn coarse and the
+        // short-repeat one fine, which is also roughly what their repeat
+        // lengths are.
+        const scale = kind === 'pet' ? 1.15 : kind === 'pla' ? 0.7 : 1;
+        const gl: Geo = { L: L * scale, inner: g.inner * scale, labelR: g.labelR * scale };
         const span   = W / Math.cos(tilt) + petSpan * 2;
         const unit   = kind === 'pet' ? petUnit : kind === 'pla' ? plaUnit : paUnit;
-        const stride = kind === 'pet' ? petSpan : kind === 'pla' ? plaSpan : paSpan;
-        let p = pt(-stride * (0.15 + hash(row) * 0.9), 0);
-        let k = 0;
+        const stride = (kind === 'pet' ? petSpan : kind === 'pla' ? plaSpan : paSpan) * scale;
         const marked = 1 + Math.floor(hash(row * 5.3 + 2) * 2);
 
-        while (p.x < span) {
-          const start = p;
-          if (kind === 'pet') {
-            const { right } = ring(ctx, pt(p.x + L, p.y), g);
-            p = unit(ctx, right, k % 2 === 1, g);
-          } else {
-            p = unit(ctx, p, k % 2 === 1, g);
+        const strand = (yOff: number, flip: boolean, bracket: boolean) => {
+          let p = pt(-stride * (0.15 + hash(row) * 0.9), yOff);
+          let k = 0;
+          while (p.x < span) {
+            const start = p;
+            if (kind === 'pet') {
+              const { right } = ring(ctx, pt(p.x + gl.L, p.y), gl);
+              p = unit(ctx, right, flip !== (k % 2 === 1), gl);
+            } else {
+              p = unit(ctx, p, flip !== (k % 2 === 1), gl);
+            }
+            // Both brackets sit the same distance ahead of a unit's start, so
+            // they cut the bonds between repeats rather than through a ring.
+            if (bracket && k === marked) {
+              brackets(ctx, start.x - gl.L * 0.45, p.x - gl.L * 0.45, (start.y + p.y) / 2, gl);
+            }
+            k++;
           }
-          // Both brackets sit the same distance ahead of a unit's start, so
-          // they cut the bonds between repeats rather than through a ring.
-          if (k === marked) {
-            brackets(ctx, start.x - L * 0.45, p.x - L * 0.45, (start.y + p.y) / 2, g);
+        };
+
+        if (kind === 'pa') {
+          // Nylon crystallises in hydrogen-bonded sheets: adjacent chains run
+          // antiparallel and the N-H of one bonds to the C=O of the next. That
+          // is the defining feature of a polyamide and the reason it behaves
+          // the way it does, so PA is drawn as a bonded pair rather than a lone
+          // strand — which also makes it read as a ladder instead of one more
+          // horizontal line.
+          const sep = gl.L * 2.6;
+          strand(0, false, true);
+          strand(sep, true, false);
+          ctx.save();
+          ctx.setLineDash([gl.L * 0.1, gl.L * 0.16]);
+          for (let x = -stride; x < span; x += stride / 2) {
+            bond(ctx, pt(x, gl.L * 0.55), pt(x, sep - gl.L * 0.55));
           }
-          k++;
+          ctx.restore();
+        } else {
+          strand(0, false, true);
         }
       }
 
       ctx.restore();
-      y += gap * (0.84 + hash(row * 2.1 + 5) * 0.34);
+      // A bonded pair is two strands tall, so it needs its own clearance.
+      y += gap * (0.84 + hash(row * 2.1 + 5) * 0.34) + (kind === 'pa' ? L * 2.6 : 0);
     }
   }
 
