@@ -29,7 +29,7 @@
 
 interface Props {
   /** 'mix' (default) · 'aluminium' · 'feedstock' (PET + PLA) · 'silicon' */
-  material?: 'mix' | 'aluminium' | 'feedstock' | 'silicon' | 'steel' | 'peek';
+  material?: 'mix' | 'aluminium' | 'feedstock' | 'silicon' | 'steel' | 'peek' | 'ptfe' | 'cellulose';
 }
 const { material = 'mix' } = Astro.props;
 ---
@@ -165,6 +165,59 @@ const { material = 'mix' } = Astro.props;
       }
       if (i === 1) carbonyl(ctx, next, -1, g);
     });
+  }
+
+  /* ── PTFE repeat ───────────────────────────────────────────────────────── */
+  // -[CF2-CF2]-. An all-carbon backbone with two fluorines on every carbon, so
+  // it draws as a dense comb of labels rather than a sparse chain. PTFE is the
+  // hotend liner and bowden tube in every printer here, and the tape on every
+  // threaded joint.
+  function ptfeUnit(ctx: CanvasRenderingContext2D, start: Pt, mirror: boolean, g: Geo): Pt {
+    return chain(ctx, start, 2, mirror, g, {}, (_i, next) => {
+      // Both F on the same carbon, splayed either side of the backbone.
+      for (const dx of [-0.52, 0.52]) {
+        const f = pt(next.x + g.L * dx, next.y + g.L * 0.78);
+        bond(ctx, next, f, 0, g.labelR * 0.8);
+        atom(ctx, f, 'F');
+      }
+    });
+  }
+
+  /* ── Cellulose repeat ──────────────────────────────────────────────────── */
+  // Beta-1,4-linked glucose: six-membered pyranose rings joined through ring
+  // oxygens, with hydroxyls hanging off. Wood, paper and flour are all this.
+  // Rings in the backbone like PET, but saturated and covered in OH, so it
+  // reads as a knobbly chain rather than a clean aromatic one.
+  function celluloseUnit(ctx: CanvasRenderingContext2D, start: Pt, mirror: boolean, g: Geo): Pt {
+    const sign = mirror ? 1 : -1;
+    // Pyranose drawn as a flat hexagon with its ring oxygen marked.
+    const c = pt(start.x + g.L, start.y);
+    const v: Pt[] = [];
+    for (let i = 0; i < 6; i++) {
+      v.push(pt(c.x + Math.cos(rad(i * 60)) * g.L, c.y + Math.sin(rad(i * 60)) * g.L));
+    }
+    for (let i = 0; i < 6; i++) {
+      // The ring oxygen sits at the top vertex; bonds around it stop short.
+      const skip = i === 4 || i === 5;
+      bond(ctx, v[i], v[(i + 1) % 6], i === 5 ? g.labelR : 0, skip && i === 4 ? g.labelR : 0);
+    }
+    atom(ctx, v[5], 'O');
+    // Hydroxyls below the ring, and the C6 arm above it.
+    for (const i of [2, 3]) {
+      const oh = pt(v[i].x, v[i].y + g.L * 0.8);
+      bond(ctx, v[i], oh, 0, g.labelR);
+      atom(ctx, oh, 'O');
+    }
+    const arm = pt(v[0].x + g.L * 0.5 * sign, v[0].y - g.L * 0.85);
+    bond(ctx, v[0], arm);
+
+    // Glycosidic link out to the next ring.
+    const link = pt(v[0].x + g.L * COS30, v[0].y + g.L * 0.5);
+    bond(ctx, v[0], link, 0, g.labelR);
+    atom(ctx, link, 'O');
+    const nextLeft = pt(link.x + g.L * COS30, link.y - g.L * 0.5);
+    bond(ctx, link, nextLeft, g.labelR, 0);
+    return nextLeft;
   }
 
   /* ── PA6 repeat ────────────────────────────────────────────────────────── */
@@ -344,6 +397,8 @@ const { material = 'mix' } = Astro.props;
     const paSpan  = 7 * L * COS30;
     const plaSpan = 3 * L * COS30;
     const peekSpan = 3 * (2 * L + 2 * L * COS30);
+    const ptfeSpan = 2 * L * COS30;
+    const celSpan  = 2 * L + 2 * L * COS30;
     // Silicon's cell is larger, so its rows need more room between them than
     // the chains or the tighter metal cell do.
     const gap     = L * (material === 'silicon' ? 5 : 3.6);
@@ -362,6 +417,8 @@ const { material = 'mix' } = Astro.props;
         : material === 'silicon'   ? 'si'
         : material === 'steel'     ? 'bct'
         : material === 'peek'      ? 'peek'
+        : material === 'ptfe'      ? 'ptfe'
+        : material === 'cellulose' ? 'cel'
         // The extruder page is only what goes through the extruder: no metal,
         // and PLA alternating with PET rather than PA.
         : material === 'feedstock' ? (hash(row * 4.3 + 7) < 0.5 ? 'pet' : 'pla')
@@ -392,13 +449,16 @@ const { material = 'mix' } = Astro.props;
         // horizontal line — so the aromatic one is drawn coarse and the
         // short-repeat one fine, which is also roughly what their repeat
         // lengths are.
-        const scale = kind === 'pet' ? 1.15 : kind === 'pla' ? 0.7 : kind === 'peek' ? 0.92 : 1;
+        const scale = kind === 'pet' ? 1.15 : kind === 'pla' ? 0.7 : kind === 'peek' ? 0.92
+                    : kind === 'ptfe' ? 0.78 : kind === 'cel' ? 1.05 : 1;
         const gl: Geo = { L: L * scale, inner: g.inner * scale, labelR: g.labelR * scale };
         const span   = W / Math.cos(tilt) + petSpan * 2;
         const unit   = kind === 'pet' ? petUnit : kind === 'pla' ? plaUnit
-                     : kind === 'peek' ? peekUnit : paUnit;
+                     : kind === 'peek' ? peekUnit : kind === 'ptfe' ? ptfeUnit
+                     : kind === 'cel' ? celluloseUnit : paUnit;
         const stride = (kind === 'pet' ? petSpan : kind === 'pla' ? plaSpan
-                      : kind === 'peek' ? peekSpan : paSpan) * scale;
+                      : kind === 'peek' ? peekSpan : kind === 'ptfe' ? ptfeSpan
+                      : kind === 'cel' ? celSpan : paSpan) * scale;
         const marked = 1 + Math.floor(hash(row * 5.3 + 2) * 2);
 
         const strand = (yOff: number, flip: boolean, bracket: boolean) => {
