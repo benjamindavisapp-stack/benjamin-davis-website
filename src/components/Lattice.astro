@@ -208,9 +208,15 @@ const { material = 'mix' } = Astro.props;
   // diamond cubic rather than close-packed — each atom bonded to four others at
   // 109.5°. That interior is the whole visual difference, so it is drawn and
   // the face diagonals are not.
+  // Bigger, and projected the other way. Side by side with the aluminium cell
+  // at the same size and angle these were nearly indistinguishable — the
+  // interior is too fine a difference to survive background contrast. The size
+  // is not arbitrary: silicon's lattice constant is 5.43 Å against aluminium's
+  // 4.05, and diamond cubic fills only 34% of its cell where close-packed FCC
+  // fills 74%, so an open, larger, sparser cell is what the material is.
   function siliconCell(ctx: CanvasRenderingContext2D, c: Pt, g: Geo) {
-    const s = g.L * 1.45;
-    const d = s * 0.42;
+    const s = g.L * 1.95;
+    const d = -s * 0.40;
     const h = s / 2;
     const front = [pt(c.x - h, c.y - h), pt(c.x + h, c.y - h),
                    pt(c.x + h, c.y + h), pt(c.x - h, c.y + h)];
@@ -280,7 +286,9 @@ const { material = 'mix' } = Astro.props;
     const petSpan = 2 * L + 7 * L * COS30;
     const paSpan  = 7 * L * COS30;
     const plaSpan = 3 * L * COS30;
-    const gap     = L * 3.6;
+    // Silicon's cell is larger, so its rows need more room between them than
+    // the chains or the tighter metal cell do.
+    const gap     = L * (material === 'silicon' ? 5 : 3.6);
 
     // Rows vary in spacing and carry a sub-degree tilt. Perfectly parallel,
     // evenly spaced rows read as wallpaper rather than a drawn structure.
@@ -312,9 +320,9 @@ const { material = 'mix' } = Astro.props;
         // is all metal there is no chain to punctuate, so they pack closer and
         // read as bulk material. The per-row tilt and offset keep them off a
         // regular grid either way.
-        const solid = material === 'aluminium' || material === 'silicon';
-        const step  = L * (solid ? 4.6 : 8);
-        const draw  = kind === 'si' ? siliconCell : cell;
+        // Close-packed metal sits tight; the open silicon lattice sits sparse.
+        const step = L * (kind === 'si' ? 8.5 : material === 'aluminium' ? 4.6 : 8);
+        const draw = kind === 'si' ? siliconCell : cell;
         for (let x = -step * (0.2 + hash(row) * 0.8); x < W / Math.cos(tilt) + step; x += step) {
           draw(ctx, pt(x, 0), g);
         }
