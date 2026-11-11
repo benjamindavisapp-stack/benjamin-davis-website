@@ -28,8 +28,8 @@
 // overflow:hidden.
 
 interface Props {
-  /** 'mix' (default) · 'aluminium' · 'feedstock' (PET + PLA) */
-  material?: 'mix' | 'aluminium' | 'feedstock';
+  /** 'mix' (default) · 'aluminium' · 'feedstock' (PET + PLA) · 'silicon' */
+  material?: 'mix' | 'aluminium' | 'feedstock' | 'silicon';
 }
 const { material = 'mix' } = Astro.props;
 ---
@@ -203,6 +203,38 @@ const { material = 'mix' } = Astro.props;
     return s + d;
   }
 
+  /* ── Silicon: diamond cubic ────────────────────────────────────────────── */
+  // Same cube as the FCC cell, but with the tetrahedral interior that makes it
+  // diamond cubic rather than close-packed — each atom bonded to four others at
+  // 109.5°. That interior is the whole visual difference, so it is drawn and
+  // the face diagonals are not.
+  function siliconCell(ctx: CanvasRenderingContext2D, c: Pt, g: Geo) {
+    const s = g.L * 1.45;
+    const d = s * 0.42;
+    const h = s / 2;
+    const front = [pt(c.x - h, c.y - h), pt(c.x + h, c.y - h),
+                   pt(c.x + h, c.y + h), pt(c.x - h, c.y + h)];
+    const back  = front.map(p => pt(p.x + d, p.y - d));
+
+    for (let i = 0; i < 4; i++) {
+      bond(ctx, front[i], front[(i + 1) % 4]);
+      bond(ctx, back[i],  back[(i + 1) % 4]);
+      bond(ctx, front[i], back[i]);
+    }
+
+    // Two of the four tetrahedral sites, at the quarter positions along the
+    // body diagonal, each bonded to the corners nearest it.
+    const r = Math.max(1, g.L * 0.1);
+    const t1 = pt(c.x - h * 0.5 + d * 0.25, c.y - h * 0.5 - d * 0.25);
+    const t2 = pt(c.x + h * 0.5 + d * 0.75, c.y + h * 0.5 - d * 0.75);
+    bond(ctx, t1, front[0]); bond(ctx, t1, front[1]); bond(ctx, t1, back[0]);
+    bond(ctx, t2, front[2]); bond(ctx, t2, front[3]); bond(ctx, t2, back[2]);
+    openRing(ctx, t1, r);
+    openRing(ctx, t2, r);
+    front.forEach(p => openRing(ctx, p, r));
+    back.forEach(p => openRing(ctx, p, r));
+  }
+
   /* ── Polymer brackets ──────────────────────────────────────────────────── */
   // [ ... ]n — the notation that says polymer rather than molecule.
   function brackets(ctx: CanvasRenderingContext2D, x0: number, x1: number, y: number, g: Geo) {
@@ -261,6 +293,7 @@ const { material = 'mix' } = Astro.props;
       const cycle = ((row % 4) + 4) % 4;
       const kind  =
           material === 'aluminium' ? 'fcc'
+        : material === 'silicon'   ? 'si'
         // The extruder page is only what goes through the extruder: no metal,
         // and PLA alternating with PET rather than PA.
         : material === 'feedstock' ? (hash(row * 4.3 + 7) < 0.5 ? 'pet' : 'pla')
@@ -272,16 +305,18 @@ const { material = 'mix' } = Astro.props;
       ctx.translate(0, y);
       ctx.rotate(tilt);
 
-      if (kind === 'fcc') {
+      if (kind === 'fcc' || kind === 'si') {
         // Against polymer, a unit cell carries far more strokes than a length
         // of chain, so evenly spaced cells read as a dense band rather than
         // punctuation — they sit about four cell widths apart. On a page that
         // is all metal there is no chain to punctuate, so they pack closer and
         // read as bulk material. The per-row tilt and offset keep them off a
         // regular grid either way.
-        const step = L * (material === 'aluminium' ? 4.6 : 8);
+        const solid = material === 'aluminium' || material === 'silicon';
+        const step  = L * (solid ? 4.6 : 8);
+        const draw  = kind === 'si' ? siliconCell : cell;
         for (let x = -step * (0.2 + hash(row) * 0.8); x < W / Math.cos(tilt) + step; x += step) {
-          cell(ctx, pt(x, 0), g);
+          draw(ctx, pt(x, 0), g);
         }
       } else {
         const span   = W / Math.cos(tilt) + petSpan * 2;
