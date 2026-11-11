@@ -4,10 +4,11 @@
 // This replaced a triangulated node-graph with a dot at every vertex — the
 // "connected dots" network background, which is both a generated-page cliché
 // and a dot grid. PET is the polymer the extrusion research actually recycles,
-// so the background now draws the thing the site is about: para-substituted
+// so the background draws the thing the site is about: para-substituted
 // benzene rings joined by ester linkages, -[O-CH2-CH2-O-CO-C6H4-CO]-, in the
 // standard skeletal convention where vertices are carbons and bonds stop short
-// of a heteroatom label.
+// of a heteroatom label. One repeat unit per row carries the polymer brackets
+// and their n subscript, which is what distinguishes a polymer from a molecule.
 //
 // Drawn once, not per frame. The old version repainted several hundred edges
 // every rAF tick behind every hero, competing with the nameplate canvas for the
@@ -19,19 +20,25 @@
 <canvas class="lattice" aria-hidden="true"></canvas>
 
 <script>
-  const L       = 26;                           // bond length (px)
-  const STROKE  = 'rgba(35, 38, 44, 0.95)';     // --panel-edge
-  const LABEL   = 'rgba(48, 52, 60, 0.95)';     // heteroatom labels, a touch brighter
-  const INNER   = 4.2;                          // aromatic inner-line offset
-  const LABEL_R = 6.5;                          // bond trim around an atom label
+  const STROKE = 'rgba(35, 38, 44, 0.95)';   // --panel-edge
+  const LABEL  = 'rgba(48, 52, 60, 0.95)';   // heteroatom labels, a touch brighter
 
   interface Pt { x: number; y: number }
 
+  // Geometry for one draw. Everything is derived from the bond length so the
+  // structure stays proportional at any size.
+  interface Geo {
+    L: number;        // bond length
+    inner: number;    // aromatic inner-line offset
+    labelR: number;   // bond trim around an atom label
+  }
+
   const pt = (x: number, y: number): Pt => ({ x, y });
   const rad = (deg: number) => (deg * Math.PI) / 180;
+  const COS30 = Math.cos(rad(30));
 
-  // Deterministic per-row jitter so the pattern isn't a rigid grid but also
-  // doesn't reshuffle on every resize.
+  // Deterministic jitter so the pattern isn't a rigid grid but also doesn't
+  // reshuffle on every resize.
   function hash(n: number): number {
     const s = Math.sin(n * 127.1) * 43758.5453;
     return s - Math.floor(s);
@@ -71,15 +78,15 @@
   /* ── Benzene ───────────────────────────────────────────────────────────── */
   // Pointy-left/right orientation, so the 1 and 4 vertices sit on the
   // horizontal axis — the para substitution PET's terephthalate unit has.
-  function ring(ctx: CanvasRenderingContext2D, centre: Pt) {
+  function ring(ctx: CanvasRenderingContext2D, centre: Pt, g: Geo) {
     const v: Pt[] = [];
     for (let i = 0; i < 6; i++) {
-      v.push(pt(centre.x + Math.cos(rad(i * 60)) * L,
-                centre.y + Math.sin(rad(i * 60)) * L));
+      v.push(pt(centre.x + Math.cos(rad(i * 60)) * g.L,
+                centre.y + Math.sin(rad(i * 60)) * g.L));
     }
     for (let i = 0; i < 6; i++) bond(ctx, v[i], v[(i + 1) % 6]);
     // Kekulé: inner lines on alternating edges, offset toward the centre.
-    for (let i = 0; i < 6; i += 2) innerLine(ctx, v[i], v[(i + 1) % 6], -INNER);
+    for (let i = 0; i < 6; i += 2) innerLine(ctx, v[i], v[(i + 1) % 6], -g.inner);
     return { left: v[3], right: v[0] };
   }
 
@@ -90,7 +97,7 @@
   // bond count means a strict zig-zag ends half a step off the line it started
   // on, so alternate units mirror their starting direction and the chain stays
   // level over each pair rather than marching off the bottom of the screen.
-  function unit(ctx: CanvasRenderingContext2D, start: Pt, mirror: boolean): Pt {
+  function unit(ctx: CanvasRenderingContext2D, start: Pt, mirror: boolean, g: Geo): Pt {
     const sign = mirror ? 1 : -1;
     let p = start;
 
@@ -102,18 +109,18 @@
 
     for (let i = 0; i < 7; i++) {
       const a = rad(sign * 30 * (i % 2 === 0 ? 1 : -1));
-      const next = pt(p.x + Math.cos(a) * L, p.y + Math.sin(a) * L);
+      const next = pt(p.x + Math.cos(a) * g.L, p.y + Math.sin(a) * g.L);
 
-      bond(ctx, p, next, marks[i] ? LABEL_R : 0, marks[i + 1] ? LABEL_R : 0);
+      bond(ctx, p, next, marks[i] ? g.labelR : 0, marks[i + 1] ? g.labelR : 0);
 
       // Carbonyl: C=O perpendicular to the chain, alternating side per group
       // so the two esters on a ring don't both point the same way.
       if (carbonylAfterBond.has(i)) {
         const dir = i === 0 ? -1 : 1;
-        const o   = pt(next.x, next.y + dir * L);
-        bond(ctx, next, o, 0, LABEL_R);
-        innerLine(ctx, next, o, 3.4, 0.22);
-        atom(ctx, pt(o.x, o.y + dir * 1.5), 'O');
+        const o   = pt(next.x, next.y + dir * g.L);
+        bond(ctx, next, o, 0, g.labelR);
+        innerLine(ctx, next, o, g.L * 0.13, 0.22);
+        atom(ctx, pt(o.x, o.y + dir * g.L * 0.06), 'O');
       }
 
       if (marks[i + 1]) atom(ctx, next, 'O');
@@ -122,35 +129,89 @@
     return p;
   }
 
+  /* ── Polymer brackets ──────────────────────────────────────────────────── */
+  // [ ... ]n around a single repeat unit. This is the notation that says
+  // "polymer" rather than "molecule", and it's the detail that makes the
+  // background legible as PET specifically rather than generic chemistry.
+  function brackets(ctx: CanvasRenderingContext2D, x0: number, x1: number, y: number, g: Geo) {
+    const h    = g.L * 1.55;          // half-height, clears rings and carbonyls
+    const claw = g.L * 0.26;          // horizontal serif
+    const draw = (x: number, dir: number) => {
+      ctx.beginPath();
+      ctx.moveTo(x + claw * dir, y - h);
+      ctx.lineTo(x, y - h);
+      ctx.lineTo(x, y + h);
+      ctx.lineTo(x + claw * dir, y + h);
+      ctx.stroke();
+    };
+    draw(x0, 1);
+    draw(x1, -1);
+
+    const prev = ctx.font;
+    ctx.font = `${Math.max(6, Math.round(g.L * 0.36))}px 'IBM Plex Mono', ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    atom(ctx, pt(x1 + claw * 0.6, y + h), 'n');
+    ctx.textAlign = 'center';
+    ctx.font = prev;
+  }
+
   /* ── Scene ─────────────────────────────────────────────────────────────── */
 
   function render(ctx: CanvasRenderingContext2D, W: number, H: number) {
     ctx.clearRect(0, 0, W, H);
-    ctx.lineWidth   = 0.8;
-    ctx.lineCap     = 'round';
-    ctx.strokeStyle = STROKE;
+
+    // Bond length tracks the viewport. Fixed at 26px, a 390px phone got barely
+    // one and a half repeat units across the hero, so the chain never resolved
+    // into a polymer — it read as loose hexagons and stray line fragments.
+    // Most visitors arrive on a phone, so that was the common case.
+    const L: number = Math.max(12, Math.min(26, W / 28));
+    const g: Geo = { L, inner: L * 0.162, labelR: L * 0.25 };
+
+    ctx.lineWidth    = Math.max(0.6, L * 0.031);
+    ctx.lineCap      = 'round';
+    ctx.lineJoin     = 'round';
+    ctx.strokeStyle  = STROKE;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = `${Math.round(L * 0.44)}px 'IBM Plex Mono', ui-monospace, monospace`;
+    ctx.font = `${Math.max(7, Math.round(L * 0.44))}px 'IBM Plex Mono', ui-monospace, monospace`;
 
-    const ringSpan  = 2 * L;
-    const chainSpan = 7 * L * Math.cos(rad(30));
-    const repeat    = ringSpan + chainSpan;
-    const rowGap    = L * 3.6;
+    const repeat = 2 * L + 7 * L * COS30;   // ring span + chain span
+    const gap    = L * 3.6;
 
-    for (let row = -1, y = -rowGap; y < H + rowGap; row++, y += rowGap) {
+    // Rows are not evenly spaced and not quite parallel. Perfectly regular
+    // banding is what made this read as wallpaper rather than a drawn
+    // structure; the spacing varies and each row carries a sub-degree tilt.
+    let y = -gap;
+    for (let row = -1; y < H + gap; row++) {
+      const tilt = (hash(row * 3.7 + 11) - 0.5) * rad(2.2);
+      const span = W / Math.cos(tilt) + repeat * 2;
+
+      ctx.save();
+      ctx.translate(0, y);
+      ctx.rotate(tilt);
+
       // Stagger each row by its own fraction of a repeat, so rings never line
       // up into columns.
-      const x0 = -repeat * (0.15 + hash(row) * 0.9);
-      let p = pt(x0, y);
+      let p = pt(-repeat * (0.15 + hash(row) * 0.9), 0);
       let k = 0;
+      // One bracketed repeat per row, never the clipped one at the left edge.
+      const marked = 1 + Math.floor(hash(row * 5.3 + 2) * 2);
 
-      while (p.x < W + repeat) {
-        const c = pt(p.x + L, p.y);
-        const { right } = ring(ctx, c);
-        p = unit(ctx, right, k % 2 === 1);
+      while (p.x < span) {
+        const start = p;
+        const { right } = ring(ctx, pt(p.x + L, p.y), g);
+        p = unit(ctx, right, k % 2 === 1, g);
+        // Both brackets sit at the same offset before a ring's left vertex, so
+        // they cut the bonds between repeats — never through a ring — and the
+        // span between them is exactly one repeat unit.
+        if (k === marked) {
+          brackets(ctx, start.x - L * 0.45, p.x - L * 0.45, (start.y + p.y) / 2, g);
+        }
         k++;
       }
+
+      ctx.restore();
+      y += gap * (0.84 + hash(row * 2.1 + 5) * 0.34);
     }
   }
 
