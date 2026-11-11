@@ -28,8 +28,8 @@
 // overflow:hidden.
 
 interface Props {
-  /** 'mix' (default) · 'aluminium' */
-  material?: 'mix' | 'aluminium';
+  /** 'mix' (default) · 'aluminium' · 'feedstock' (PET + PLA) */
+  material?: 'mix' | 'aluminium' | 'feedstock';
 }
 const { material = 'mix' } = Astro.props;
 ---
@@ -151,6 +151,22 @@ const { material = 'mix' } = Astro.props;
     });
   }
 
+  /* ── PLA repeat ────────────────────────────────────────────────────────── */
+  // O - CH(CH3) - C(=O). Three backbone atoms, so it is much shorter than the
+  // other two, and the methyl hanging off every repeat is what identifies it
+  // on sight — the only one of these polymers with a branch.
+  function plaUnit(ctx: CanvasRenderingContext2D, start: Pt, mirror: boolean, g: Geo): Pt {
+    return chain(ctx, start, 3, mirror, g, { 0: 'O', 3: 'O' }, (i, next) => {
+      if (i === 0) {
+        // Pendant methyl, drawn away from the chain on the opposite side to
+        // the carbonyl so the two don't collide.
+        const m = pt(next.x, next.y + g.L * 0.9);
+        bond(ctx, next, m);
+      }
+      if (i === 1) carbonyl(ctx, next, -1, g);
+    });
+  }
+
   /* ── PA6 repeat ────────────────────────────────────────────────────────── */
   // N - CH2 x5 - C(=O) - N. No ring, so it reads as a long zig-zag punctuated
   // by one amide, which is the visual counterpoint to PET.
@@ -231,6 +247,7 @@ const { material = 'mix' } = Astro.props;
 
     const petSpan = 2 * L + 7 * L * COS30;
     const paSpan  = 7 * L * COS30;
+    const plaSpan = 3 * L * COS30;
     const gap     = L * 3.6;
 
     // Rows vary in spacing and carry a sub-degree tilt. Perfectly parallel,
@@ -242,9 +259,13 @@ const { material = 'mix' } = Astro.props;
       // or five a hero actually has — the first cell landed on row 9, so most
       // heroes showed no aluminium at all.
       const cycle = ((row % 4) + 4) % 4;
-      const kind  = material === 'aluminium'
-        ? 'fcc'
-        : (cycle === 1 ? 'fcc' : (hash(row * 4.3 + 7) < 0.5 ? 'pet' : 'pa'));
+      const kind  =
+          material === 'aluminium' ? 'fcc'
+        // The extruder page is only what goes through the extruder: no metal,
+        // and PLA alternating with PET rather than PA.
+        : material === 'feedstock' ? (hash(row * 4.3 + 7) < 0.5 ? 'pet' : 'pla')
+        : cycle === 1 ? 'fcc'
+        : (hash(row * 4.3 + 7) < 0.5 ? 'pet' : 'pa');
       const tilt  = (hash(row * 3.7 + 11) - 0.5) * rad(2.2);
 
       ctx.save();
@@ -264,8 +285,8 @@ const { material = 'mix' } = Astro.props;
         }
       } else {
         const span   = W / Math.cos(tilt) + petSpan * 2;
-        const unit   = kind === 'pet' ? petUnit : paUnit;
-        const stride = kind === 'pet' ? petSpan : paSpan;
+        const unit   = kind === 'pet' ? petUnit : kind === 'pla' ? plaUnit : paUnit;
+        const stride = kind === 'pet' ? petSpan : kind === 'pla' ? plaSpan : paSpan;
         let p = pt(-stride * (0.15 + hash(row) * 0.9), 0);
         let k = 0;
         const marked = 1 + Math.floor(hash(row * 5.3 + 2) * 2);
