@@ -18,11 +18,23 @@
 // rings at the lattice points. Deliberately not filled dots: 14 filled circles
 // in a regular box is a dot grid, which is the pattern this background replaced.
 //
+// A page can name its own material with the `material` prop. This changes only
+// where a page is genuinely about one substance — the card page is aluminium
+// because the card is milled from 6061-T6. Everywhere else keeps the house mix,
+// so a change in the background actually means something rather than being
+// variety for its own sake.
+//
 // Drawn once, not per frame. Caller must give the parent position:relative and
 // overflow:hidden.
+
+interface Props {
+  /** 'mix' (default) · 'aluminium' */
+  material?: 'mix' | 'aluminium';
+}
+const { material = 'mix' } = Astro.props;
 ---
 
-<canvas class="lattice" aria-hidden="true"></canvas>
+<canvas class="lattice" data-material={material} aria-hidden="true"></canvas>
 
 <script>
   // Sits ~1.65:1 against --graphite. The first version was 1.27:1, which looked
@@ -201,7 +213,7 @@
 
   /* ── Scene ─────────────────────────────────────────────────────────────── */
 
-  function render(ctx: CanvasRenderingContext2D, W: number, H: number) {
+  function render(ctx: CanvasRenderingContext2D, W: number, H: number, material: string) {
     ctx.clearRect(0, 0, W, H);
 
     // Bond length tracks the viewport. Fixed, a 390px phone got barely one and
@@ -230,7 +242,9 @@
       // or five a hero actually has — the first cell landed on row 9, so most
       // heroes showed no aluminium at all.
       const cycle = ((row % 4) + 4) % 4;
-      const kind  = cycle === 1 ? 'fcc' : (hash(row * 4.3 + 7) < 0.5 ? 'pet' : 'pa');
+      const kind  = material === 'aluminium'
+        ? 'fcc'
+        : (cycle === 1 ? 'fcc' : (hash(row * 4.3 + 7) < 0.5 ? 'pet' : 'pa'));
       const tilt  = (hash(row * 3.7 + 11) - 0.5) * rad(2.2);
 
       ctx.save();
@@ -238,11 +252,13 @@
       ctx.rotate(tilt);
 
       if (kind === 'fcc') {
-        // Metal sits sparse against the polymer. A unit cell carries far more
-        // strokes than a length of chain does, so spacing that looks even on
-        // paper reads as a dense band on screen — these sit about four cell
-        // widths apart, which keeps them punctuation rather than a stripe.
-        const step = L * 8;
+        // Against polymer, a unit cell carries far more strokes than a length
+        // of chain, so evenly spaced cells read as a dense band rather than
+        // punctuation — they sit about four cell widths apart. On a page that
+        // is all metal there is no chain to punctuate, so they pack closer and
+        // read as bulk material. The per-row tilt and offset keep them off a
+        // regular grid either way.
+        const step = L * (material === 'aluminium' ? 4.6 : 8);
         for (let x = -step * (0.2 + hash(row) * 0.8); x < W / Math.cos(tilt) + step; x += step) {
           cell(ctx, pt(x, 0), g);
         }
@@ -279,6 +295,8 @@
   document.querySelectorAll<HTMLCanvasElement>('canvas.lattice').forEach(canvas => {
     const ctx = canvas.getContext('2d')!;
 
+    const material = canvas.dataset.material || 'mix';
+
     function draw() {
       const w = canvas.offsetWidth, h = canvas.offsetHeight;
       if (w < 2 || h < 2) return;
@@ -286,7 +304,7 @@
       canvas.width  = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      render(ctx, w, h);
+      render(ctx, w, h, material);
     }
 
     let pending = 0;

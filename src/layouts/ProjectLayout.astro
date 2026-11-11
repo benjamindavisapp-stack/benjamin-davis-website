@@ -46,6 +46,8 @@ interface Props {
   nextProject?: NavProject;
   ogImage?: string;
   description?: string;
+  /** Background structure, for a project that is about one material. */
+  material?: 'mix' | 'aluminium';
 }
 
 const {
@@ -60,6 +62,7 @@ const {
   nextProject,
   ogImage,
   description,
+  material = 'mix',
 } = Astro.props;
 ---
 
@@ -71,7 +74,7 @@ const {
 
   <!-- ── Hero ──────────────────────────────────────────────────────────────── -->
   <section class="proj-hero">
-    <Lattice />
+    <Lattice material={material} />
     <Bolt position="tl" />
     <Bolt position="tr" />
     <Bolt position="bl" />
