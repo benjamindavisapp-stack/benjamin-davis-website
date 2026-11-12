@@ -14,13 +14,36 @@ const { position, size = 18 } = Astro.props;
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
-    <!-- Outer rim -->
-    <circle cx="10" cy="10" r="8.5" stroke="var(--panel-edge)" stroke-width="1.2" fill="var(--panel)" />
-    <!-- Recessed well -->
-    <circle cx="10" cy="10" r="5.5" fill="var(--graphite)" />
-    <!-- Phillips drive -->
-    <line x1="10" y1="5.5" x2="10" y2="14.5" stroke="var(--gold-dim)" stroke-width="1.4" stroke-linecap="round" />
-    <line x1="5.5" y1="10" x2="14.5" y2="10" stroke="var(--gold-dim)" stroke-width="1.4" stroke-linecap="round" />
+    <!-- Hex head, flat-top orientation -->
+    <polygon
+      points="18.8,10 14.4,2.38 5.6,2.38 1.2,10 5.6,17.62 14.4,17.62"
+      stroke="var(--panel-edge)" stroke-width="1.2" fill="var(--panel)" />
+    <!-- Machined head face, a step lighter than the head side so the
+         chamfer reads as a top surface -->
+    <polygon
+      points="16.9,10 13.45,4.02 6.55,4.02 3.1,10 6.55,15.98 13.45,15.98"
+      stroke="var(--panel-edge)" stroke-width="0.7" fill="var(--panel-edge)" opacity="0.85" />
+    <!-- Torx (6-lobe) recess. Two same-shape unions of overlapping circles:
+         a slightly larger light one underneath becomes the rim catching
+         light, the near-black one on top is the recess itself. -->
+    <g fill="var(--steel)" opacity="0.55">
+      <circle cx="10"   cy="10"    r="3.15" />
+      <circle cx="13.0" cy="10"    r="2.0"  />
+      <circle cx="11.5" cy="7.40"  r="2.0"  />
+      <circle cx="8.5"  cy="7.40"  r="2.0"  />
+      <circle cx="7.0"  cy="10"    r="2.0"  />
+      <circle cx="8.5"  cy="12.60" r="2.0"  />
+      <circle cx="11.5" cy="12.60" r="2.0"  />
+    </g>
+    <g fill="#08090b">
+      <circle cx="10"   cy="10"    r="2.7"  />
+      <circle cx="13.0" cy="10"    r="1.55" />
+      <circle cx="11.5" cy="7.40"  r="1.55" />
+      <circle cx="8.5"  cy="7.40"  r="1.55" />
+      <circle cx="7.0"  cy="10"    r="1.55" />
+      <circle cx="8.5"  cy="12.60" r="1.55" />
+      <circle cx="11.5" cy="12.60" r="1.55" />
+    </g>
   </svg>
 </span>
 

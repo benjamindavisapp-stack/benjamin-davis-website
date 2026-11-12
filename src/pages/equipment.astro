@@ -6,53 +6,94 @@ import FDMText from '@/components/FDMText.astro';
 
 const additive = [
   {
-    name:    'Bambu Lab H2C',
+    name:    'Bambu Lab X2D',
+    type:    'FDM 3D Printer — Dual Nozzle',
+    specs: [
+      { key: 'Build volume',  val: '256 × 256 × 260 mm' },
+      { key: 'Speed',         val: 'Up to 1000 mm/s' },
+      { key: 'Chamber',       val: 'Enclosed, actively heated to 65 °C' },
+      { key: 'Multi-material', val: 'Dual nozzle + AMS 2 Pro' },
+    ],
+    notes:   'The lab printer at Bishop Feehan, bought with ISEF winnings. Jigs, fixtures, printed tooling, and TechForge student projects all run on it. I send the engineering filaments to this one because of the chamber: PC and nylon keep shrinking as they cool, so on an open printer the bottom of a tall part finishes contracting while the top is still being laid down, and the corners lift off the plate somewhere in the middle. Holding the chamber at 65 °C keeps the whole part at one temperature until it is done.',
+    image:   null,
+    imageAlt: 'Bambu Lab X2D dual-nozzle 3D printer in the fabrication lab',
+  },
+  {
+    name:    'Bambu Lab A1',
     type:    'FDM 3D Printer',
     specs: [
       { key: 'Build volume',  val: '256 × 256 × 256 mm' },
-      { key: 'Speed',         val: 'Up to 600 mm/s' },
-      { key: 'Min layer',     val: '0.05 mm' },
-      { key: 'Multi-material', val: 'AMS system' },
+      { key: 'Speed',         val: 'Up to 500 mm/s' },
+      { key: 'Multi-material', val: 'AMS lite, 4 colors' },
+      { key: 'Location',      val: 'Home workshop' },
     ],
-    notes:   'Primary printer for rapid prototyping, jigs, fixtures, and TechForge student projects. Secured via ISEF winnings for Bishop Feehan\'s fabrication lab.',
+    notes:   'My own printer, and the one every batch of recycled filament gets tried on first. It is open-frame, so I can see the first layer going down from across the garage and stop a run as soon as the extrusion starts to look starved (which is what a diameter dip looks like before the calipers confirm it). If a spool is going to jam an extruder, I would rather it jam this one than the lab machine.',
     image:   null,
-    imageAlt: 'Bambu Lab H2C 3D printer in the fabrication lab',
+    imageAlt: 'Bambu Lab A1 printer on the workshop bench',
   },
   {
-    name:    'FDM Workshop Printer',
-    type:    'FDM 3D Printer',
+    name:    'Creality Halot R6',
+    type:    'MSLA Resin 3D Printer',
     specs: [
-      { key: 'Location', val: 'Home workshop' },
-      { key: 'Use case', val: 'Overnight runs, filament R&D' },
+      { key: 'Build volume', val: '130 × 80 × 160 mm' },
+      { key: 'XY resolution', val: '50 µm (2560 × 1620, 2K)' },
+      { key: 'Layer height',  val: '0.01 – 0.2 mm' },
+      { key: 'Light source',  val: '405 nm UV LED' },
     ],
-    notes:   'At-home unit used for overnight production runs, iterating on the recycled-filament output quality, and parts that need monitoring.',
+    notes:   'For the parts where FDM layer lines are too coarse to tell me anything — small housings, and the thread-fit coupons I check under a loupe. At 50 µm in XY it holds a feature the A1 would turn into a staircase. The floor is 130 × 80 mm and cured resin is brittle, so nothing structural comes off it.',
     image:   null,
-    imageAlt: 'Workshop FDM printer',
+    imageAlt: 'Creality Halot R6 resin printer with its lid closed',
+  },
+  {
+    name:    'Creality UW-03',
+    type:    'Wash & Cure Station',
+    specs: [
+      { key: 'Wash volume',  val: '6.72 L (210 × 160 × 200 mm)' },
+      { key: 'Cure volume',  val: '10.64 L (215 × 165 × 300 mm)' },
+      { key: 'UV array',     val: '18 × 405 nm LED, 360° exposure' },
+      { key: 'Cycle time',   val: '5 – 30 min, wash or cure' },
+    ],
+    notes:   'A resin print is not finished when the printer stops. The part comes out coated in uncured resin, and that film has to come off in isopropyl before the UV array can reach what is underneath it; the cure is the step that takes the part from soft to full hardness. Doing both in one machine means I am not carrying a dripping part across the garage between them.',
+    image:   null,
+    imageAlt: 'Creality UW-03 wash and cure station next to the resin printer',
   },
 ];
 
 const cnc = [
   {
-    name:    'CNC Router / Mill',
-    type:    'Subtractive Manufacturing',
+    name:    'Bridgeport Series I — CNC Retrofit',
+    type:    'Vertical Knee Mill',
     specs: [
-      { key: 'Application', val: 'Precision panel routing, engraving' },
-      { key: 'Materials',   val: 'Aluminum, brass, acrylic, wood' },
+      { key: 'Control',   val: '3-axis CNC retrofit' },
+      { key: 'Spindle',   val: 'R8 taper' },
+      { key: 'Table',     val: '9 × 42 in' },
+      { key: 'Materials', val: 'Steel, aluminum, brass' },
     ],
-    notes:   'Used to machine the brass business card engraving plates, fixture plates for the extrusion system, and custom panel cutouts.',
+    notes:   'The heavy machine, and the only one here with the mass to take a real cut in steel. It cut the fixture plates for the extrusion system, faced stock flat, and bored the bearing seats — a twist drill walks as it enters, and a shaft sitting in a walked hole will never run true, so those seats had to come out of a boring head.',
     image:   null,
-    imageAlt: 'CNC router machining a metal workpiece',
+    imageAlt: 'Bridgeport knee mill with CNC retrofit in the workshop',
   },
   {
-    name:    'Drill Press & Bench Tools',
-    type:    'Manual Machining',
+    name:    'Genmitsu 3030-PROVer',
+    type:    'Desktop CNC Router',
     specs: [
-      { key: 'Tools', val: 'Drill press, tap & die set, files, vise' },
+      { key: 'Work area', val: '300 × 300 mm' },
+      { key: 'Motion',    val: 'Ball screws, dual linear guides' },
+      { key: 'Materials', val: 'Brass, aluminum, acrylic, wood' },
     ],
-    notes:   'Core hand-tool set used to complete the 800+ hours of fabrication on the extrusion machine. Precise hole placement, thread cutting, and manual finishing.',
+    notes:   'The small, precise one. It cut the engraving plates for the brass business cards and the panel cutouts for the control box. The ball screws are the part that matters: a lead screw has backlash, so the cutter lags behind the axis every time it reverses and one side of an engraved line comes out wider than the other. On this one the line is the same width in both directions, which is the whole reason the card lettering is legible.',
     image:   null,
-    imageAlt: 'Bench tools in the home workshop',
+    imageAlt: 'Genmitsu desktop CNC router engraving a brass plate',
   },
+];
+
+const handTools = [
+  { name: 'Drill press',   role: 'Hole placement on the extruder frame. A hand drill wanders off the punch mark; this one does not.' },
+  { name: 'Dremel',        role: 'Cut-off wheels and carbide burrs, for the clearance cuts and the deburring in spots nothing larger reaches' },
+  { name: 'Angle grinder', role: 'Cutting steel section to length for the frame, and bulk stock removal before anything needs to be accurate' },
+  { name: 'Tap & die set', role: 'I cut every threaded hole on the extrusion machine by hand with these' },
+  { name: 'Files',         role: 'Fitting parts that came off the mill a few thousandths proud, and breaking the edges before assembly' },
+  { name: 'Bench vise',    role: 'Holds the work for all of the above' },
 ];
 
 const electronics = [
@@ -71,11 +112,10 @@ const electronics = [
     name:    'Digital Instruments',
     type:    'Measurement & Test',
     specs: [
-      { key: 'DMM',       val: 'Fluke / benchtop multimeter' },
+      { key: 'DMM',       val: 'Benchtop multimeter' },
       { key: 'Calipers',  val: 'Digital, 0.01 mm resolution' },
-      { key: 'Filament gauge', val: '0.001 mm micrometer' },
     ],
-    notes:   'Measurement tooling critical to validating filament diameter within commercial tolerances (±0.05 mm). Calipers used on every manufactured component.',
+    notes:   'The calipers are what every manufactured component gets checked against, and they are how I confirmed the filament was holding ±0.05 mm. A 0.01 mm resolution is enough to catch a batch drifting out of that band, though a dedicated filament gauge would catch it sooner than I do now.',
     image:   null,
     imageAlt: 'Digital calipers measuring a machined part',
   },
@@ -116,6 +156,7 @@ const software = [
   { name: 'OnShape',      role: 'Cloud-based CAD for collaborative and quick-iterate designs' },
   { name: 'Fritzing',     role: 'PCB schematic and board layout for custom electronics' },
   { name: 'Bambu Studio', role: 'Slicer for all Bambu Lab print jobs; multi-color setup' },
+  { name: 'Halot Box',    role: 'Slicer for the Halot R6; resin exposure and support tuning' },
   { name: 'Arduino IDE',  role: 'Firmware development for embedded control systems' },
 ];
 ---
@@ -141,7 +182,7 @@ const software = [
         </h1>
       </FDMText>
       <p class="hero-sub">
-        Most of this lives in a garage, and most of it was bought second-hand or built.
+        Some of this is in the school fabrication lab. The rest is in a garage.
       </p>
     </div>
   </section>
@@ -218,6 +259,20 @@ const software = [
           </article>
         ))}
       </div>
+
+      <div class="sub-header">
+        <h3 class="sub-title">Bench &amp; hand tools</h3>
+        <p class="sub-note">Not glamorous, and responsible for most of the 800 hours.</p>
+      </div>
+
+      <ul class="stack-list">
+        {handTools.map(t => (
+          <li class="stack-item">
+            <span class="stack-name">{t.name}</span>
+            <span class="stack-role">{t.role}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   </section>
 
@@ -306,11 +361,11 @@ const software = [
         </FDMText>
       </div>
 
-      <ul class="software-list">
+      <ul class="stack-list">
         {software.map(s => (
-          <li class="software-item">
-            <span class="sw-name">{s.name}</span>
-            <span class="sw-role">{s.role}</span>
+          <li class="stack-item">
+            <span class="stack-name">{s.name}</span>
+            <span class="stack-role">{s.role}</span>
           </li>
         ))}
       </ul>
@@ -389,7 +444,7 @@ const software = [
   /* ── Equipment grid ───────────────────────────────────────────────────────── */
   .equip-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
     gap: 1px;
     border: 1px solid var(--panel-edge);
   }
@@ -532,14 +587,39 @@ const software = [
   }
   .fc-link:hover { color: var(--gold-bright); }
 
-  /* ── Software list ────────────────────────────────────────────────────────── */
-  .software-list {
+  /* ── Sub-header (within a section) ─────────────────────────────────────────── */
+  .sub-header {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    margin-block: 2.5rem 1.25rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .sub-title {
+    font-family: var(--font-head);
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--text);
+  }
+  .sub-note {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+  }
+
+  /* ── Shared name + role list (software, hand tools) ───────────────────────── */
+  .stack-list {
     list-style: none;
     display: flex;
     flex-direction: column;
     border: 1px solid var(--panel-edge);
   }
-  .software-item {
+  .stack-item {
     display: flex;
     align-items: baseline;
     gap: 1rem;
@@ -547,9 +627,9 @@ const software = [
     border-bottom: 1px solid var(--panel-edge);
     transition: background 0.15s;
   }
-  .software-item:last-child { border-bottom: none; }
-  .software-item:hover { background: var(--panel); }
-  .sw-name {
+  .stack-item:last-child { border-bottom: none; }
+  .stack-item:hover { background: var(--panel); }
+  .stack-name {
     font-family: var(--font-head);
     font-size: 1rem;
     font-weight: 700;
@@ -557,7 +637,7 @@ const software = [
     min-width: 130px;
     flex-shrink: 0;
   }
-  .sw-role { font-size: 0.82rem; color: var(--steel); line-height: 1.5; }
+  .stack-role { font-size: 0.82rem; color: var(--steel); line-height: 1.5; }
 
   /* ── Gold accent ──────────────────────────────────────────────────────────── */
   .gold { color: var(--gold); }
@@ -567,7 +647,7 @@ const software = [
     .featured-card { grid-template-columns: 1fr; }
     .fc-image-wrap { max-height: 200px; }
     .fc-body { padding: 1.25rem; }
-    .software-item { flex-direction: column; gap: 0.25rem; }
-    .sw-name { min-width: unset; }
+    .stack-item { flex-direction: column; gap: 0.25rem; }
+    .stack-name { min-width: unset; }
   }
 </style>

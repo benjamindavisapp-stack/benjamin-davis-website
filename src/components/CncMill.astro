@@ -118,6 +118,12 @@
       return;
     }
 
+    // Returning visitor this session: the full cut has already played, so
+    // replay it compressed — long enough to read as machining, short enough
+    // not to gate the name a second time.
+    let REPLAY = false;
+    try { REPLAY = sessionStorage.getItem('cnc-cut') === '1'; } catch (e) { /* storage blocked */ }
+
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
     const PW  = Math.round(W * DPR);
     const PH  = Math.round(H * DPR);
@@ -349,7 +355,12 @@
     // Pass 1: sweep in from the field's farthest point down to R1 of every
     // glyph — the tool spirals toward the text instead of raking back and
     // forth blind to its shape.
-    const roughPath1 = buildContourRings(inkDist, Math.max(R1, maxDist - R1 * 0.5), R1, R1);
+    // Stepover 1.5×R1, not R1: the widest cut a R1 channel (drawn 2.2×R1
+    // wide) still fully overlaps. Far from the letters nothing needs a tight
+    // stepover, and the old R1 spacing spent ~2.5s of the show machining
+    // empty border before any letterform appeared.
+    const STEP1 = R1 * 1.5;
+    const roughPath1 = buildContourRings(inkDist, Math.max(R1, maxDist - R1 * 0.5), R1, STEP1);
     // Pass 2: continue inward from pass 1, down to R2. Start strictly
     // inside R1, not at it — pass 1's own last ring already traced that
     // exact contour, so starting fromLevel at R1 here would retrace it a
@@ -367,7 +378,7 @@
     const fieldOff = mkCanvas(PW, PH);
     const fiCtx    = fieldOff.getContext('2d')!;
     fiCtx.scale(DPR, DPR);
-    renderField(fiCtx, W, H, R1, R1, inkDist, DPR);
+    renderField(fiCtx, W, H, R1, STEP1, inkDist, DPR);
 
     /* ── Pre-render: finer field texture left by the semi-finish pass ─────── */
     // Same model, smaller tool + tighter stepover (R2) — a real, visibly
@@ -393,6 +404,37 @@
     shCtx.fillText('BENJAMIN', W / 2, L1Y);
     shCtx.fillText('DAVIS',    W / 2, L2Y);
     shCtx.globalCompositeOperation = 'source-over';
+
+    /* ── Pre-render: layout scribe lines ─────────────────────────────────── */
+    // What a machinist does before the first cut: datum lines and the part
+    // outline scribed into the stock. Puts the name on screen from frame
+    // one, so the roughing passes read as working toward something instead
+    // of eating an anonymous blob. Every later composite layer (cut field,
+    // revealed letters) is opaque and paints over this, so the scribe marks
+    // survive exactly as long as the surface they were scratched into.
+    const scribeOff = mkCanvas(PW, PH);
+    const sbCtx     = scribeOff.getContext('2d')!;
+    sbCtx.scale(DPR, DPR);
+    // Datum lines: both baselines and the vertical centreline, edge to edge
+    sbCtx.strokeStyle = 'rgba(58,34,0,0.28)';
+    sbCtx.lineWidth   = 0.7;
+    sbCtx.beginPath();
+    sbCtx.moveTo(0, L1Y);   sbCtx.lineTo(W, L1Y);
+    sbCtx.moveTo(0, L2Y);   sbCtx.lineTo(W, L2Y);
+    sbCtx.moveTo(W / 2, 0); sbCtx.lineTo(W / 2, H);
+    sbCtx.stroke();
+    // Glyph outlines: a dark scratch with a thin catch-light offset below-right,
+    // the way a real scribed line reads on bright metal
+    sbCtx.font = FONT; sbCtx.textAlign = 'center'; sbCtx.textBaseline = 'alphabetic';
+    sbCtx.lineJoin = 'round';
+    sbCtx.strokeStyle = 'rgba(255,232,150,0.22)';
+    sbCtx.lineWidth   = 1.0;
+    sbCtx.strokeText('BENJAMIN', W / 2 + 0.7, L1Y + 0.7);
+    sbCtx.strokeText('DAVIS',    W / 2 + 0.7, L2Y + 0.7);
+    sbCtx.strokeStyle = 'rgba(48,27,0,0.60)';
+    sbCtx.lineWidth   = 1.3;
+    sbCtx.strokeText('BENJAMIN', W / 2, L1Y);
+    sbCtx.strokeText('DAVIS',    W / 2, L2Y);
 
     /* ── Cut accumulation map (grows each frame) ─────────────────────────── */
     const cutOff = mkCanvas(PW, PH);
@@ -520,6 +562,10 @@
         sCtx.fillStyle = sp;
         sCtx.fillRect(0, 0, W, H);
       }
+
+      // 1c. Layout scribe — visible only until the surface carrying it is
+      // machined away (steps 2 and 5 paint over it) or the part is done.
+      if (!animDone) sCtx.drawImage(scribeOff, 0, 0, W, H);
 
       // 2. Machined field where cut (fieldOff intersect cutOff)
       tmCtx.clearRect(0, 0, W, H);
@@ -682,6 +728,19 @@
       ctx.ellipse(cx + r*sc, cy + r*sc*1.55, sr, sr * 0.62, 0.15, 0, Math.PI * 2);
       ctx.fill();
 
+      // Spindle nose looming above the cutter, out of focus. A real collet
+      // is far wider than the flutes, which is also what keeps the R4
+      // finishing tool (2-3px of flutes) findable on screen.
+      const colletR = Math.max(r * 1.75, 7);
+      const nose = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, colletR);
+      nose.addColorStop(0,    'rgba(16,18,26,0.42)');
+      nose.addColorStop(0.72, 'rgba(16,18,26,0.30)');
+      nose.addColorStop(1,    'rgba(16,18,26,0)');
+      ctx.fillStyle = nose;
+      ctx.beginPath(); ctx.arc(cx, cy, colletR, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, colletR * 0.82, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(120,132,158,0.30)'; ctx.lineWidth = 1.0; ctx.stroke();
+
       // Body
       ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fillStyle = '#2c3040'; ctx.fill();
@@ -742,7 +801,7 @@
         const load = 0.32 + 0.68 * loadFrac;
         const halo = ctx.createRadialGradient(cx, cy, r * 0.68, cx, cy, r * 1.82);
         halo.addColorStop(0,    'rgba(255,196,55,0)');
-        halo.addColorStop(0.60, `rgba(255,172,35,${(0.18 * load).toFixed(3)})`);
+        halo.addColorStop(0.60, `rgba(255,172,35,${(0.30 * load).toFixed(3)})`);
         halo.addColorStop(1,    'rgba(255,112,10,0)');
         ctx.fillStyle = halo;
         ctx.beginPath(); ctx.arc(cx, cy, r * 1.82 * (0.85 + 0.15 * loadFrac), 0, Math.PI * 2); ctx.fill();
@@ -755,7 +814,7 @@
       len: number; ang: number; curl: number; life: number; w: number;
     }
     const chips: Chip[] = [];
-    const MAX_CHIPS = W < 360 ? 80 : 200;
+    const MAX_CHIPS = W < 360 ? 120 : 280;
 
     function emitChip(cx: number, cy: number, dirX: number) {
       if (chips.length >= MAX_CHIPS) return;
@@ -843,12 +902,23 @@
         fCtx.lineWidth = c.w; fCtx.lineCap = 'round';
         fCtx.beginPath(); fCtx.moveTo(c.x, c.y);
         fCtx.quadraticCurveTo(mx, my, ex, ey2); fCtx.stroke();
+        // Fresh off the cutter the chip is a hot bright sliver; the glint
+        // dies within the first few frames of flight.
+        if (c.life > 1.05) {
+          fCtx.strokeStyle = `rgba(255,236,150,${((c.life - 1.05) * 1.6).toFixed(2)})`;
+          fCtx.lineWidth = c.w * 0.8;
+          fCtx.beginPath(); fCtx.moveTo(c.x, c.y);
+          fCtx.lineTo(c.x + Math.cos(c.ang) * c.len * 0.55, c.y + Math.sin(c.ang) * c.len * 0.55);
+          fCtx.stroke();
+        }
         fCtx.restore();
       }
     }
 
     /* ── Finalise: drop canvas behind content, expose supporting elements ── */
     function finalise() {
+      parent.removeEventListener('pointerdown', onSkip);
+      try { sessionStorage.setItem('cnc-cut', '1'); } catch (e) { /* storage blocked */ }
       fxEl.style.display = 'none';
       stockEl.style.zIndex = '1';
       parent.classList.add('cnc-done');
@@ -902,8 +972,8 @@
        intermediate sub-segment, so a larger dt removes the same material in
        fewer frames rather than skipping any of it, and its own 400-step guard
        bounds the extra work a boosted frame can take on. */
-    const JOB_TIME     = 6;    // s — wall-clock target for the whole sequence
-    const TIME_CAP     = 8;    // s — hard deadline: finish the part outright
+    const JOB_TIME     = REPLAY ? 1.1 : 3.8;  // s — wall-clock target for the whole sequence
+    const TIME_CAP     = REPLAY ? 1.6 : 5.2;  // s — hard deadline: finish the part outright
     const MAX_DT       = 0.2;  // s — per-frame advance ceiling (GC, tab restore)
     const MAX_OVERRIDE = 14;   // × — ceiling on the override multiplier
 
@@ -931,10 +1001,23 @@
       finalise();
     }
 
+    /* ── Tap to skip ──────────────────────────────────────────────────────
+       Anyone who has seen enough gets the finished plate on a tap/click.
+       Same end state as the deadline path. The listener comes off in
+       finalise(), so taps on the finished plate do nothing. */
+    let skipped = false;
+    function onSkip() {
+      if (animDone || skipped) return;
+      skipped = true;
+      finishNow();
+    }
+    parent.addEventListener('pointerdown', onSkip);
+
     // Show initial brass immediately before rAF starts
     composite();
 
     function frame(ts: number) {
+      if (skipped) return;
       if (startTs === null) startTs = ts;
       if (!lastTs) lastTs = ts;
       const wall = (ts - startTs) / 1000;
@@ -978,9 +1061,9 @@
           (nx, ny, fx, fy, w, load, dirX) => {
             cut(nx, ny, fx, fy, w);
             const k = 0.5 + 0.5 * load;
-            if (Math.random() < 0.40 * k) emitChip(nx, ny, dirX);
-            if (Math.random() < 0.06 * k) emitBigChip(nx, ny, dirX);
-            if (Math.random() < 0.22 * k) emitNeedle(nx, ny, dirX);
+            if (Math.random() < 0.70 * k) emitChip(nx, ny, dirX);
+            if (Math.random() < 0.11 * k) emitBigChip(nx, ny, dirX);
+            if (Math.random() < 0.38 * k) emitNeedle(nx, ny, dirX);
           });
         pathIdx = res.pathIdx; tx = res.tx; ty = res.ty;
         lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
@@ -1012,8 +1095,8 @@
             cut(nx, ny, fx, fy, w);
             cut2(nx, ny, fx, fy, w);
             const k = 0.5 + 0.5 * load;
-            if (Math.random() < 0.28 * k) emitChip(nx, ny, dirX);
-            if (Math.random() < 0.18 * k) emitNeedle(nx, ny, dirX);
+            if (Math.random() < 0.50 * k) emitChip(nx, ny, dirX);
+            if (Math.random() < 0.30 * k) emitNeedle(nx, ny, dirX);
           });
         pathIdx = res.pathIdx; tx = res.tx; ty = res.ty;
         lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
@@ -1048,8 +1131,8 @@
           (nx, ny, fx, fy, w, load, dirX) => {
             cut(nx, ny, fx, fy, w);
             const k = 0.5 + 0.5 * load;
-            if (Math.random() < 0.10 * k) emitChip(nx, ny, dirX);
-            if (Math.random() < 0.18 * k) emitNeedle(nx, ny, dirX);
+            if (Math.random() < 0.20 * k) emitChip(nx, ny, dirX);
+            if (Math.random() < 0.30 * k) emitNeedle(nx, ny, dirX);
           });
         pathIdx = res.pathIdx; tx = res.tx; ty = res.ty;
         lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
@@ -1091,7 +1174,7 @@
       requestAnimationFrame(frame);
     }
 
-    setTimeout(() => requestAnimationFrame(frame), 380);
+    setTimeout(() => requestAnimationFrame(frame), REPLAY ? 60 : 150);
   }
 
   /* ── Pre-render: bright brushed brass ──────────────────────────────────── */
