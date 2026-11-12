@@ -56,7 +56,6 @@
   }
 
   /* After animation: raise supporting content above the brass canvas (z-index:1) */
-  :global(.cnc-done .np-location),
   :global(.cnc-done .np-rule),
   :global(.cnc-done .np-role),
   :global(.cnc-done .np-tapped) {
@@ -84,6 +83,7 @@
     const fxEl    = document.querySelector<HTMLCanvasElement>('.cnc-fx');
     if (!stockEl || !fxEl) return;
     const parent = stockEl.parentElement!;
+    parent.classList.add('cnc-machining');
     // Belt-and-suspenders: the stylesheet rule above should already make the
     // heading transparent from first paint with no JS dependency, but force
     // it via inline style too, synchronously, as early as this script can
@@ -142,7 +142,7 @@
     const FONT     = `900 ${fontSize}px 'Saira Condensed', 'Arial Narrow', sans-serif`;
     const lineH    = fontSize * 0.92;
     const capH     = fontSize * 0.70;
-    const L1Y      = (H - capH - lineH) / 2 + capH;  // BENJAMIN baseline
+    const L1Y      = (H - capH - lineH - fontSize * 0.52) / 2 + capH;  // BENJAMIN baseline (band below DAVIS reserved for the etched subtitle)
     const L2Y      = L1Y + lineH;                      // DAVIS baseline
 
     /* ── Tool params ─────────────────────────────────────────────────────── */
@@ -158,6 +158,32 @@
     const SPIN   = Math.PI * 14;
     const SHX    = Math.ceil(R * 0.45);
     const SHY    = Math.ceil(R * 0.62);
+
+    /* ── Bolt-hole plan ──────────────────────────────────────────────────── */
+    // Hole centres come from the real .bolt elements so the drilled holes
+    // land exactly under the bolts that later seat into them. Order is a
+    // ring (tl → tr → br → bl), not a diagonal zig-zag.
+    interface Hole { x: number; y: number; drill: number; thread: number; }
+    const boltEls = Array.from(parent.querySelectorAll<HTMLElement>('.bolt'));
+    let HOLE_R = 6.5;
+    const holes: Hole[] = boltEls.map(b => {
+      const br = b.getBoundingClientRect();
+      HOLE_R = Math.max(4.5, br.width * 0.29);
+      return { x: br.left + br.width / 2 - rect.left, y: br.top + br.height / 2 - rect.top, drill: 0, thread: 0 };
+    });
+    if (holes.length === 0) {
+      const m = 25.6;
+      holes.push({ x: m, y: m, drill: 0, thread: 0 }, { x: W - m, y: m, drill: 0, thread: 0 },
+                 { x: m, y: H - m, drill: 0, thread: 0 }, { x: W - m, y: H - m, drill: 0, thread: 0 });
+    }
+    const holeOrder = holes.length === 4 ? [0, 1, 3, 2] : holes.map((_, i) => i);
+    const TM_R   = HOLE_R * 0.55;   // thread-mill radius
+    const ORBIT  = HOLE_R * 0.45;   // thread-milling orbit radius
+
+    /* ── Laser etch font ─────────────────────────────────────────────────── */
+    const ETCH_FS    = fontSize * 0.205;
+    const ETCH_FONT  = `700 ${ETCH_FS}px 'Saira Condensed', 'Arial Narrow', sans-serif`;
+    const ETCH_TRACK = ETCH_FS * 0.22;
 
     // Feed-rate response: how fast the simulated servo loop reaches a target
     // speed. Rapids snap faster than cutting feeds — no cutting load to
@@ -423,6 +449,15 @@
     sbCtx.moveTo(0, L2Y);   sbCtx.lineTo(W, L2Y);
     sbCtx.moveTo(W / 2, 0); sbCtx.lineTo(W / 2, H);
     sbCtx.stroke();
+    // Drill-centre crosshairs where the bolt holes go
+    sbCtx.strokeStyle = 'rgba(58,34,0,0.45)';
+    sbCtx.lineWidth   = 0.8;
+    sbCtx.beginPath();
+    for (const h of holes) {
+      sbCtx.moveTo(h.x - 4.5, h.y); sbCtx.lineTo(h.x + 4.5, h.y);
+      sbCtx.moveTo(h.x, h.y - 4.5); sbCtx.lineTo(h.x, h.y + 4.5);
+    }
+    sbCtx.stroke();
     // Glyph outlines: a dark scratch with a thin catch-light offset below-right,
     // the way a real scribed line reads on bright metal
     sbCtx.font = FONT; sbCtx.textAlign = 'center'; sbCtx.textBaseline = 'alphabetic';
@@ -435,6 +470,35 @@
     sbCtx.lineWidth   = 1.3;
     sbCtx.strokeText('BENJAMIN', W / 2, L1Y);
     sbCtx.strokeText('DAVIS',    W / 2, L2Y);
+
+    /* ── Pre-render: laser-etched rule + subtitle ────────────────────────── */
+    // The old DOM lines ("Wrentham, MA", "Advanced Manufacturing") are gone
+    // from the visible plate; the subtitle is annealed into the brass by a
+    // laser head instead — dark charcoal gray, the mark a fibre laser
+    // actually leaves on brass. Transparent DOM twins keep the text in the
+    // accessibility tree the same way the h1 does for the name.
+    const ETCH_RULE_Y = L2Y + fontSize * 0.175;
+    const ETCH_RULE_W = W * 0.58;
+    const ETCH_RULE_X = (W - ETCH_RULE_W) / 2;
+    const ETCH_BASE   = L2Y + fontSize * 0.50;
+    const ETCH_HEAD_Y = ETCH_BASE - ETCH_FS * 0.32;
+    const etchOff = mkCanvas(PW, PH);
+    const etCtx   = etchOff.getContext('2d')!;
+    etCtx.scale(DPR, DPR);
+    etCtx.font = ETCH_FONT;
+    try { (etCtx as any).letterSpacing = ETCH_TRACK.toFixed(2) + 'px'; } catch (e) { /* older engines */ }
+    const ETCH_TEXT = 'ADVANCED MANUFACTURING';
+    const ETCH_W    = etCtx.measureText(ETCH_TEXT).width;
+    const ETCH_X    = (W - ETCH_W) / 2;
+    etCtx.strokeStyle = 'rgba(44,47,52,0.92)';
+    etCtx.lineWidth   = 1.3;
+    etCtx.beginPath(); etCtx.moveTo(ETCH_RULE_X, ETCH_RULE_Y); etCtx.lineTo(ETCH_RULE_X + ETCH_RULE_W, ETCH_RULE_Y); etCtx.stroke();
+    // subtitle: faint light kick below-right, then the dark anneal on top
+    etCtx.textAlign = 'left'; etCtx.textBaseline = 'alphabetic';
+    etCtx.fillStyle = 'rgba(255,230,150,0.10)';
+    etCtx.fillText(ETCH_TEXT, ETCH_X + 0.7, ETCH_BASE + 0.7);
+    etCtx.fillStyle = '#34383e';
+    etCtx.fillText(ETCH_TEXT, ETCH_X, ETCH_BASE);
 
     /* ── Cut accumulation map (grows each frame) ─────────────────────────── */
     const cutOff = mkCanvas(PW, PH);
@@ -649,6 +713,45 @@
       tmCtx.drawImage(maskOff, 0, 0, W, H);
       tmCtx.globalCompositeOperation = 'source-over';
       sCtx.drawImage(tmpOff, 0, 0, W, H);
+
+      // 8. Drilled and tapped corner holes
+      for (const h of holes) {
+        if (h.drill <= 0) continue;
+        const hr = HOLE_R * (0.5 + 0.5 * h.drill);
+        const bore = sCtx.createRadialGradient(h.x - hr * 0.25, h.y - hr * 0.25, hr * 0.1, h.x, h.y, hr);
+        bore.addColorStop(0,    'rgba(8,6,2,0.98)');
+        bore.addColorStop(0.72, 'rgba(28,19,4,0.95)');
+        bore.addColorStop(1,    'rgba(66,48,12,0.92)');
+        sCtx.fillStyle = bore;
+        sCtx.beginPath(); sCtx.arc(h.x, h.y, hr, 0, Math.PI * 2); sCtx.fill();
+        // chamfer rim catching light
+        sCtx.strokeStyle = 'rgba(255,238,160,0.26)';
+        sCtx.lineWidth = 1.0;
+        sCtx.beginPath(); sCtx.arc(h.x, h.y, hr + 0.7, 0, Math.PI * 2); sCtx.stroke();
+        if (h.thread > 0) {
+          // thread crests appear as the mill orbits, clockwise from top
+          const a0 = -Math.PI / 2;
+          sCtx.strokeStyle = 'rgba(214,178,80,0.55)';
+          sCtx.lineWidth = 0.8;
+          sCtx.beginPath(); sCtx.arc(h.x, h.y, hr * 0.80, a0, a0 + h.thread * Math.PI * 2); sCtx.stroke();
+          sCtx.beginPath(); sCtx.arc(h.x, h.y, hr * 0.58, a0 + 0.9, a0 + 0.9 + h.thread * Math.PI * 2); sCtx.stroke();
+        }
+      }
+
+      // 9. Laser etch, revealed left to right behind the head
+      if (etchRuleP > 0) {
+        const w = ETCH_RULE_W * etchRuleP;
+        if (w > 0.5) sCtx.drawImage(etchOff,
+          ETCH_RULE_X * DPR, (ETCH_RULE_Y - 3) * DPR, w * DPR, 6 * DPR,
+          ETCH_RULE_X, ETCH_RULE_Y - 3, w, 6);
+      }
+      if (etchTextP > 0) {
+        const w = ETCH_W * etchTextP;
+        const top = ETCH_BASE - ETCH_FS * 1.05, bh = ETCH_FS * 1.4;
+        if (w > 0.5) sCtx.drawImage(etchOff,
+          ETCH_X * DPR, top * DPR, w * DPR, bh * DPR,
+          ETCH_X, top, w, bh);
+      }
     }
 
     /* ── Advance cut map: stroke a channel from (fromX,fromY) to (x,y) ─── */
@@ -711,10 +814,11 @@
     function drawMill(
       ctx: CanvasRenderingContext2D,
       cx: number, cy: number, r: number,
-      angle: number, cutting: boolean, lifted: boolean, loadFrac = 1
+      angle: number, cutting: boolean, lifted: boolean, loadFrac = 1,
+      kind: ToolKind = 'mill'
     ) {
       const FLUTES = 4, TRAIL = 5, TGAP = 0.20, SWEEP = 0.65;
-      const DETAIL_MIN = 4; // below this radius skip flutes, render simplified disk
+      const DETAIL_MIN = kind === 'mill' ? 4 : 2.5; // below this radius skip flutes, render simplified disk
 
       // Drop shadow — larger when lifted (in rapid/approach)
       const sc  = lifted ? 0.28 : 0.13;
@@ -741,6 +845,28 @@
       ctx.beginPath(); ctx.arc(cx, cy, colletR * 0.82, 0, Math.PI * 2);
       ctx.strokeStyle = 'rgba(120,132,158,0.30)'; ctx.lineWidth = 1.0; ctx.stroke();
 
+      if (kind === 'laser') {
+        // Laser head: dark housing, white-hot focal point, no rotation.
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = '#171a22'; ctx.fill();
+        ctx.strokeStyle = 'rgba(142,158,185,0.55)'; ctx.lineWidth = 1.1;
+        ctx.beginPath(); ctx.arc(cx, cy, r * 0.96, 0, Math.PI * 2); ctx.stroke();
+        if (cutting && !lifted) {
+          const flick = 0.82 + 0.18 * Math.sin(angle * 3.1);
+          const spot = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 2.4);
+          spot.addColorStop(0,    `rgba(255,252,235,${(0.95 * flick).toFixed(2)})`);
+          spot.addColorStop(0.18, `rgba(255,220,130,${(0.55 * flick).toFixed(2)})`);
+          spot.addColorStop(0.5,  'rgba(255,170,60,0.16)');
+          spot.addColorStop(1,    'rgba(255,140,30,0)');
+          ctx.fillStyle = spot;
+          ctx.beginPath(); ctx.arc(cx, cy, r * 2.4, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(cx, cy, r * 0.30, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,240,200,0.5)'; ctx.fill();
+        }
+        return;
+      }
+
       // Body
       ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fillStyle = '#2c3040'; ctx.fill();
@@ -757,24 +883,45 @@
         lit.addColorStop(1,    'rgba(10,11,16,1)');
         ctx.fillStyle = lit; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
 
-        // Helical flutes with angular motion-blur trail
+        // Flute geometry per tool, each with the angular motion-blur trail
+        const nF    = kind === 'drill' ? 2 : kind === 'tap' ? 8 : FLUTES;
+        const sweep = kind === 'drill' ? 1.9 : kind === 'tap' ? 0 : SWEEP;
         for (let t = TRAIL; t >= 0; t--) {
           const ta = angle - t * TGAP;
           const al = t === 0 ? 0.95 : ((TRAIL - t + 0.8) / (TRAIL + 1)) * 0.55;
           ctx.save(); ctx.globalAlpha = al;
-          for (let f = 0; f < FLUTES; f++) {
-            const fa  = ta + (f / FLUTES) * Math.PI * 2;
-            const x1  = cx + r * 0.28 * Math.cos(fa);
-            const y1  = cy + r * 0.28 * Math.sin(fa);
-            const x2  = cx + r * 0.90 * Math.cos(fa + SWEEP);
-            const y2  = cy + r * 0.90 * Math.sin(fa + SWEEP);
-            const cpx = cx + r * 0.60 * Math.cos(fa + SWEEP * 0.46);
-            const cpy = cy + r * 0.60 * Math.sin(fa + SWEEP * 0.46);
+          for (let f = 0; f < nF; f++) {
+            const fa = ta + (f / nF) * Math.PI * 2;
             ctx.strokeStyle = t === 0 ? 'rgba(226,234,252,0.93)' : 'rgba(165,176,202,0.82)';
-            ctx.lineWidth   = t === 0 ? 1.22 : 0.72;
             ctx.lineCap = 'round';
-            ctx.beginPath(); ctx.moveTo(x1, y1);
-            ctx.quadraticCurveTo(cpx, cpy, x2, y2); ctx.stroke();
+            if (kind === 'tap') {
+              // thread-mill teeth: short radial cutters on the rim
+              ctx.lineWidth = t === 0 ? 1.25 : 0.7;
+              ctx.beginPath();
+              ctx.moveTo(cx + r * 0.62 * Math.cos(fa), cy + r * 0.62 * Math.sin(fa));
+              ctx.lineTo(cx + r * 1.00 * Math.cos(fa), cy + r * 1.00 * Math.sin(fa));
+              ctx.stroke();
+            } else {
+              // mill: 4 slim helical flutes. drill: 2 wide S-flutes.
+              const x1  = cx + r * (kind === 'drill' ? 0.12 : 0.28) * Math.cos(fa);
+              const y1  = cy + r * (kind === 'drill' ? 0.12 : 0.28) * Math.sin(fa);
+              const x2  = cx + r * 0.90 * Math.cos(fa + sweep);
+              const y2  = cy + r * 0.90 * Math.sin(fa + sweep);
+              const cpx = cx + r * 0.60 * Math.cos(fa + sweep * 0.46);
+              const cpy = cy + r * 0.60 * Math.sin(fa + sweep * 0.46);
+              ctx.lineWidth = (t === 0 ? 1.22 : 0.72) * (kind === 'drill' ? 1.8 : 1);
+              ctx.beginPath(); ctx.moveTo(x1, y1);
+              ctx.quadraticCurveTo(cpx, cpy, x2, y2); ctx.stroke();
+            }
+          }
+          // drill chisel edge across the centre
+          if (kind === 'drill' && t === 0) {
+            ctx.lineWidth = 1.4;
+            ctx.strokeStyle = 'rgba(236,242,255,0.9)';
+            ctx.beginPath();
+            ctx.moveTo(cx + r * 0.26 * Math.cos(ta + 0.3), cy + r * 0.26 * Math.sin(ta + 0.3));
+            ctx.lineTo(cx - r * 0.26 * Math.cos(ta + 0.3), cy - r * 0.26 * Math.sin(ta + 0.3));
+            ctx.stroke();
           }
           ctx.restore();
         }
@@ -917,6 +1064,7 @@
 
     /* ── Finalise: drop canvas behind content, expose supporting elements ── */
     function finalise() {
+      parent.classList.add('cnc-bolted');
       parent.removeEventListener('pointerdown', onSkip);
       try { sessionStorage.setItem('cnc-cut', '1'); } catch (e) { /* storage blocked */ }
       fxEl.style.display = 'none';
@@ -931,6 +1079,8 @@
       cuCtx.drawImage(maskOff, 0, 0, W, H);
       cuCtx.globalCompositeOperation = 'source-over';
       animDone = true;
+      for (const h of holes) { h.drill = 1; h.thread = 1; }
+      etchRuleP = 1; etchTextP = 1;
       composite();
       finalise();
       return;
@@ -941,8 +1091,13 @@
       | 'approach'
       | 'rough1'    | 'r2_rapid'  | 'rough2'
       | 'fin_rapid' | 'finishing'
+      | 'drill_rapid' | 'drilling'
+      | 'tm_rapid'    | 'threading'
+      | 'head_out'    | 'laser_in'
+      | 'etch_rule'   | 'etch_jog' | 'etch_text'
       | 'settle'
       | 'retract'   | 'done';
+    type ToolKind = 'mill' | 'drill' | 'tap' | 'laser';
 
     const approachDest = roughPath1.length > 0 ? roughPath1[0] : { x: W / 2, y: R1 };
 
@@ -955,6 +1110,11 @@
     let settleT  = 0;
     let lifted   = true;
     let curR     = R1;
+    let curKind: ToolKind = 'mill';
+    let holeIdx  = 0;
+    let opT      = 0;
+    let etchRuleP = 0;
+    let etchTextP = 0;
     let curLoad  = 1;
     let lastTs: number | null = null;
     let startTs: number | null = null;
@@ -972,8 +1132,12 @@
        intermediate sub-segment, so a larger dt removes the same material in
        fewer frames rather than skipping any of it, and its own 400-step guard
        bounds the extra work a boosted frame can take on. */
-    const JOB_TIME     = REPLAY ? 1.1 : 3.8;  // s — wall-clock target for the whole sequence
-    const TIME_CAP     = REPLAY ? 1.6 : 5.2;  // s — hard deadline: finish the part outright
+    const JOB_TIME     = REPLAY ? 1.0 : 3.2;  // s — wall-clock target for the milling
+    const TIME_CAP     = REPLAY ? 3.2 : 8.0;  // s — hard deadline: finish the part outright
+    const DRILL_T      = REPLAY ? 0.05 : 0.11; // s per hole
+    const THREAD_T     = REPLAY ? 0.07 : 0.15; // s per orbit
+    const ETCH_RULE_T  = REPLAY ? 0.09 : 0.20; // s for the divider line
+    const ETCH_TEXT_T  = REPLAY ? 0.27 : 0.60; // s for the subtitle
     const MAX_DT       = 0.2;  // s — per-frame advance ceiling (GC, tab restore)
     const MAX_OVERRIDE = 14;   // × — ceiling on the override multiplier
 
@@ -997,6 +1161,8 @@
     function finishNow() {
       animDone = true;
       finalizeCutMask();
+      for (const h of holes) { h.drill = 1; h.thread = 1; }
+      etchRuleP = 1; etchTextP = 1;
       composite();
       finalise();
     }
@@ -1138,6 +1304,103 @@
         lifted = res.lifted; cutting = res.cutting; curLoad = res.loadFrac;
         if (pathIdx >= finOuterPath.length) {
           animDone = true; finalizeCutMask();
+          phase = 'drill_rapid'; holeIdx = 0;
+          curKind = 'drill'; curR = HOLE_R * 0.96;
+        }
+      }
+
+      /* ── DRILL: rapid to each corner, plunge the bolt holes ──────────── */
+      else if (phase === 'drill_rapid') {
+        lifted = true; cutting = false;
+        const dest = holes[holeOrder[holeIdx]];
+        const dx = dest.x - tx, dy = dest.y - ty, dist = Math.hypot(dx, dy);
+        const spd = rampToward(RAPID, RATE_RAPID, dt);
+        if (dist < 2) { tx = dest.x; ty = dest.y; phase = 'drilling'; opT = 0; }
+        else { const sN = Math.min(spd * dt / dist, 1); tx += dx * sN; ty += dy * sN; }
+      }
+      else if (phase === 'drilling') {
+        cutting = true; lifted = false; curLoad = 1;
+        const h = holes[holeOrder[holeIdx]];
+        opT += dt / DRILL_T;
+        h.drill = Math.min(1, opT);
+        if (Math.random() < 0.85) emitNeedle(tx, ty, Math.random() < 0.5 ? 1 : -1);
+        if (Math.random() < 0.45) emitChip(tx, ty, Math.random() < 0.5 ? 1 : -1);
+        if (opT >= 1) {
+          h.drill = 1; holeIdx++;
+          if (holeIdx < holes.length) phase = 'drill_rapid';
+          else { phase = 'tm_rapid'; holeIdx = 0; curKind = 'tap'; curR = TM_R; }
+        }
+      }
+
+      /* ── THREAD MILL: orbit each hole once, cutting the thread ────────── */
+      else if (phase === 'tm_rapid') {
+        lifted = true; cutting = false;
+        const hc = holes[holeOrder[holeIdx]];
+        const dx = hc.x - tx, dy = (hc.y - ORBIT) - ty, dist = Math.hypot(dx, dy);
+        const spd = rampToward(RAPID, RATE_RAPID, dt);
+        if (dist < 2) { tx = hc.x; ty = hc.y - ORBIT; phase = 'threading'; opT = 0; }
+        else { const sN = Math.min(spd * dt / dist, 1); tx += dx * sN; ty += dy * sN; }
+      }
+      else if (phase === 'threading') {
+        cutting = true; lifted = false; curLoad = 1;
+        const h = holes[holeOrder[holeIdx]];
+        opT += dt / THREAD_T;
+        const a = -Math.PI / 2 + Math.min(1, opT) * Math.PI * 2;
+        tx = h.x + ORBIT * Math.cos(a);
+        ty = h.y + ORBIT * Math.sin(a);
+        h.thread = Math.min(1, opT);
+        if (Math.random() < 0.5) emitNeedle(tx, ty, Math.cos(a) >= 0 ? 1 : -1);
+        if (opT >= 1) {
+          h.thread = 1; holeIdx++;
+          if (holeIdx < holes.length) phase = 'tm_rapid';
+          else phase = 'head_out';
+        }
+      }
+
+      /* ── TOOL CHANGE: spindle leaves, laser head takes over ───────────── */
+      else if (phase === 'head_out') {
+        lifted = true; cutting = false;
+        const spd = rampToward(RAPID * 1.3, RATE_RAPID, dt);
+        ty -= spd * dt;
+        if (ty < -R1 * 4) {
+          curKind = 'laser'; curR = Math.max(3.5, R1 * 0.45);
+          tx = -R1 * 3; ty = ETCH_RULE_Y;
+          phase = 'laser_in';
+        }
+      }
+      else if (phase === 'laser_in') {
+        lifted = true; cutting = false;
+        const dx = ETCH_RULE_X - tx, dy = ETCH_RULE_Y - ty, dist = Math.hypot(dx, dy);
+        const spd = rampToward(RAPID, RATE_RAPID, dt);
+        if (dist < 2) { tx = ETCH_RULE_X; ty = ETCH_RULE_Y; phase = 'etch_rule'; opT = 0; }
+        else { const sN = Math.min(spd * dt / dist, 1); tx += dx * sN; ty += dy * sN; }
+      }
+
+      /* ── LASER ETCH: the divider rule, then the subtitle ──────────────── */
+      else if (phase === 'etch_rule') {
+        cutting = true; lifted = false; curLoad = 1;
+        opT += dt / ETCH_RULE_T;
+        etchRuleP = Math.min(1, opT);
+        tx = ETCH_RULE_X + ETCH_RULE_W * etchRuleP; ty = ETCH_RULE_Y;
+        if (Math.random() < 0.4) emitNeedle(tx, ty, 1);
+        if (opT >= 1) { phase = 'etch_jog'; opT = 0; }
+      }
+      else if (phase === 'etch_jog') {
+        lifted = true; cutting = false;
+        const dx = ETCH_X - tx, dy = ETCH_HEAD_Y - ty, dist = Math.hypot(dx, dy);
+        const spd = rampToward(RAPID, RATE_RAPID, dt);
+        if (dist < 2) { tx = ETCH_X; ty = ETCH_HEAD_Y; phase = 'etch_text'; opT = 0; }
+        else { const sN = Math.min(spd * dt / dist, 1); tx += dx * sN; ty += dy * sN; }
+      }
+      else if (phase === 'etch_text') {
+        cutting = true; lifted = false; curLoad = 1;
+        opT += dt / ETCH_TEXT_T;
+        etchTextP = Math.min(1, opT);
+        tx = ETCH_X + ETCH_W * etchTextP; ty = ETCH_HEAD_Y;
+        if (Math.random() < 0.55) emitNeedle(tx, ty, 1);
+        if (opT >= 1) {
+          // machining and marking done — send the bolts home
+          parent.classList.add('cnc-bolted');
           phase = 'settle'; settleT = 0;
         }
       }
@@ -1170,7 +1433,7 @@
 
       composite();
       tickChips();
-      if (phase !== 'done') drawMill(fCtx, tx, ty, curR, spinA, cutting, lifted, curLoad);
+      if (phase !== 'done') drawMill(fCtx, tx, ty, curR, spinA, cutting, lifted, curLoad, curKind);
       requestAnimationFrame(frame);
     }
 
@@ -1289,6 +1552,7 @@
 
   /* ── Reduced-motion finish helper ───────────────────────────────────────── */
   function showDone(stockEl: HTMLCanvasElement, fxEl: HTMLCanvasElement, parent: HTMLElement) {
+    parent.classList.add('cnc-bolted');
     fxEl.style.display = 'none';
     stockEl.style.zIndex = '1';
     parent.classList.add('cnc-done');

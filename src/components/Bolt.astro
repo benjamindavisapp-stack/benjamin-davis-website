@@ -68,6 +68,20 @@ const { position, size = 18 } = Astro.props;
     100% { opacity: 0.7; transform: scale(1)    rotate(120deg); }
   }
 
+  /* On the CNC nameplate the holes have to exist first: the canvas adds
+     cnc-machining as soon as its script runs (pausing the seat animation at
+     its 0% frame, which is invisible), and cnc-bolted once the holes are
+     drilled and tapped — the bolts then rotate home above the canvas.
+     Pages without the canvas never get either class and keep the original
+     load-time seating. */
+  :global(.nameplate.cnc-machining) .bolt {
+    animation-play-state: paused;
+  }
+  :global(.nameplate.cnc-bolted) .bolt {
+    animation-play-state: running;
+    z-index: 12;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .bolt { animation: none; }
   }

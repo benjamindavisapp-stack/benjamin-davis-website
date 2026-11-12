@@ -21,8 +21,6 @@ import CncMill  from '@/components/CncMill.astro';
         <Bolt position="bl" size={24} />
         <Bolt position="br" size={24} />
 
-        <p class="np-location">Wrentham, MA &middot; Class of 2027</p>
-
         <h1 class="np-name">Benjamin<br/>Davis</h1>
 
         <div class="np-rule" aria-hidden="true"></div>
@@ -349,14 +347,6 @@ import CncMill  from '@/components/CncMill.astro';
     gap: 0.55rem;
   }
 
-  .np-location {
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--steel);
-  }
-
   .np-name {
     font-family: var(--font-head);
     font-size: clamp(3.75rem, 14vw, 6rem);
@@ -371,17 +361,22 @@ import CncMill  from '@/components/CncMill.astro';
   .np-rule {
     width: 72%;
     height: 1px;
-    background: var(--panel-edge);
+    background: transparent;
     margin-block: 0.2rem;
   }
 
+  /* The subtitle and divider are laser-etched into the canvas plate; these
+     DOM twins stay transparent but keep the text in the accessibility tree
+     and the layout box, the same trick the np-name heading uses. */
   .np-role {
     font-family: var(--font-head);
     font-size: clamp(0.85rem, 3.5vw, 1.1rem);
     font-weight: 700;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: var(--steel);
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    user-select: none;
   }
 
   /* Subtle "you tapped in" nod — inside the nameplate like a card stamp */
